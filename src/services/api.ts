@@ -1,0 +1,1347 @@
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  DbAnnouncement,
+  DbTool,
+  DbCourse,
+  DbDocumentation,
+  DbMission,
+  DbMissionProgress,
+  DbCsatResult,
+  DbRRHistory,
+  DbUser,
+  DbModule,
+  DbUserPermission,
+  DbUserStatus,
+  CollaboratorStatus,
+  DbCourseProgress,
+  RankingRow,
+  DbReclameAquiCase,
+  DbReclameAquiMetric,
+  DbNpsResponse,
+  DbCrispConversation,
+  DbHelpdesk,
+} from "@/types/database";
+
+function client() {
+  if (!supabase) {
+    throw new Error(
+      "Supabase não configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env."
+    );
+  }
+  return supabase;
+}
+
+// ---------- Perfil / Usuários ----------
+
+export async function fetchCurrentProfile(authId: string): Promise<DbUser | null> {
+  const { data, error } = await client()
+    .from("users")
+    .select("*, roles(*)")
+    .eq("auth_id", authId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as DbUser | null;
+}
+
+export async function fetchUsers(): Promise<DbUser[]> {
+  const { data, error } = await client()
+    .from("users")
+    .select("*, roles(*)")
+    .order("nome");
+  if (error) throw error;
+  return (data ?? []) as DbUser[];
+}
+
+export async function upsertUser(user: Partial<DbUser> & { id?: string }) {
+  const { data, error } = await client().from("users").upsert(user).select().single();
+  if (error) throw error;
+  return data as DbUser;
+}
+
+export async function deleteUser(id: string) {
+  const { error } = await client().from("users").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchRoles() {
+  const { data, error } = await client().from("roles").select("*").order("nome");
+  if (error) throw error;
+  return data;
+}
+
+// ---------- Comunicados / Atualizações ----------
+
+export async function fetchAnnouncements(limit?: number): Promise<DbAnnouncement[]> {
+  let query = client()
+    .from("announcements")
+    .select("*")
+    .eq("ativo", true)
+    .order("fixado", { ascending: false })
+    .order("data_publicacao", { ascending: false });
+  if (limit) query = query.limit(limit);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as DbAnnouncement[];
+}
+
+export async function fetchAllAnnouncements(): Promise<DbAnnouncement[]> {
+  const { data, error } = await client()
+    .from("announcements")
+    .select("*")
+    .order("data_publicacao", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbAnnouncement[];
+}
+
+export async function upsertAnnouncement(a: Partial<DbAnnouncement> & { id?: string }) {
+  const { data, error } = await client().from("announcements").upsert(a).select().single();
+  if (error) throw error;
+  return data as DbAnnouncement;
+}
+
+export async function deleteAnnouncement(id: string) {
+  const { error } = await client().from("announcements").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- Outros Links (antiga "Ferramentas") ----------
+
+export async function fetchTools(): Promise<DbTool[]> {
+  const { data, error } = await client()
+    .from("tools")
+    .select("*")
+    .eq("ativo", true)
+    .order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbTool[];
+}
+
+// Para o admin: traz também os links inativos
+export async function fetchAllTools(): Promise<DbTool[]> {
+  const { data, error } = await client().from("tools").select("*").order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbTool[];
+}
+
+export async function upsertTool(tool: Partial<DbTool> & { id?: string }) {
+  const { data, error } = await client().from("tools").upsert(tool).select().single();
+  if (error) throw error;
+  return data as DbTool;
+}
+
+export async function deleteTool(id: string) {
+  const { error } = await client().from("tools").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- Cursos ----------
+
+export async function fetchCourses(): Promise<DbCourse[]> {
+  const { data, error } = await client()
+    .from("courses")
+    .select("*")
+    .eq("publicado", true)
+    .order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbCourse[];
+}
+
+export async function fetchAllCourses(): Promise<DbCourse[]> {
+  const { data, error } = await client().from("courses").select("*").order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbCourse[];
+}
+
+export async function upsertCourse(c: Partial<DbCourse> & { id?: string }) {
+  const { data, error } = await client().from("courses").upsert(c).select().single();
+  if (error) throw error;
+  return data as DbCourse;
+}
+
+export async function deleteCourse(id: string) {
+  const { error } = await client().from("courses").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- Documentação ----------
+
+export async function fetchDocumentation(): Promise<DbDocumentation[]> {
+  const { data, error } = await client()
+    .from("documentation")
+    .select("*")
+    .eq("publicado", true)
+    .order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbDocumentation[];
+}
+
+export async function fetchAllDocumentation(): Promise<DbDocumentation[]> {
+  const { data, error } = await client().from("documentation").select("*").order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbDocumentation[];
+}
+
+export async function upsertDocumentation(d: Partial<DbDocumentation> & { id?: string }) {
+  const { data, error } = await client().from("documentation").upsert(d).select().single();
+  if (error) throw error;
+  return data as DbDocumentation;
+}
+
+export async function deleteDocumentation(id: string) {
+  const { error } = await client().from("documentation").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- Missões ----------
+
+export async function fetchMissions(): Promise<DbMission[]> {
+  const { data, error } = await client()
+    .from("missions")
+    .select("*")
+    .eq("ativo", true)
+    .order("prazo");
+  if (error) throw error;
+  return (data ?? []) as DbMission[];
+}
+
+// Para quem tem permissão de gerenciar Missões: traz todas, ativas ou não
+export async function fetchAllMissions(): Promise<DbMission[]> {
+  const { data, error } = await client()
+    .from("missions")
+    .select("*, responsavel:users!missions_responsavel_id_fkey(*)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbMission[];
+}
+
+export async function upsertMission(mission: Partial<DbMission> & { id?: string }) {
+  const { data, error } = await client().from("missions").upsert(mission).select().single();
+  if (error) throw error;
+  return data as DbMission;
+}
+
+export async function deleteMission(id: string) {
+  const { error } = await client().from("missions").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function claimMission(missionId: string) {
+  const { data, error } = await client().rpc("claim_mission", { p_mission_id: missionId });
+  if (error) throw error;
+  return data as DbMission;
+}
+
+export async function fetchMissionProgress(userId: string): Promise<DbMissionProgress[]> {
+  const { data, error } = await client()
+    .from("mission_progress")
+    .select("*, missions(*)")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return (data ?? []) as DbMissionProgress[];
+}
+
+// ---------- CSAT ----------
+
+export async function fetchCsatForUser(email: string): Promise<DbCsatResult[]> {
+  const { data, error } = await client()
+    .from("csat_results")
+    .select("*")
+    .eq("email_atendente", email)
+    .order("data_hora", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbCsatResult[];
+}
+
+export async function fetchCsatTeamAverage(): Promise<{ media: number; total: number }> {
+  const { data, error } = await client().from("csat_results").select("nota");
+  if (error) throw error;
+  const notas = (data ?? []).map((d) => d.nota).filter((n): n is number => n !== null);
+  const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
+  return { media, total: notas.length };
+}
+
+export async function fetchTeamCsatMonthly(): Promise<
+  { mes: string; media: number; total: number }[]
+> {
+  const { data, error } = await client().rpc("team_csat_monthly");
+  if (error) throw error;
+  return (data ?? []) as { mes: string; media: number; total: number }[];
+}
+
+// ---------- Reunião de Resultados ----------
+
+export async function fetchRRHistory(userId: string): Promise<DbRRHistory[]> {
+  const { data, error } = await client()
+    .from("rr_history")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbRRHistory[];
+}
+
+export async function insertRRHistory(payload: Omit<DbRRHistory, "id" | "created_at">) {
+  const { data, error } = await client()
+    .from("rr_history")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbRRHistory;
+}
+
+// ---------- Permissões granulares ----------
+
+export async function fetchModules(): Promise<DbModule[]> {
+  const { data, error } = await client().from("modules").select("*").order("ordem");
+  if (error) throw error;
+  return (data ?? []) as DbModule[];
+}
+
+export async function upsertModule(m: Partial<DbModule> & { id?: string }) {
+  const { data, error } = await client().from("modules").upsert(m).select().single();
+  if (error) throw error;
+  return data as DbModule;
+}
+
+export async function deleteModule(id: string) {
+  const { error } = await client().from("modules").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function upsertRole(r: { id?: string; nome: string; descricao?: string }) {
+  const { data, error } = await client().from("roles").upsert(r).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteRole(id: string) {
+  const { error } = await client().from("roles").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Permissões do usuário atualmente logado (usado pelo front para decidir o que mostrar)
+export async function fetchMyPermissions(userId: string): Promise<string[]> {
+  const { data, error } = await client()
+    .from("user_permissions")
+    .select("pode_gerenciar, modules(slug)")
+    .eq("user_id", userId)
+    .eq("pode_gerenciar", true);
+  if (error) throw error;
+  return (data ?? [])
+    .map((row: { modules?: { slug: string | null } | null }) => row.modules?.slug)
+    .filter((s): s is string => Boolean(s));
+}
+
+// Todas as permissões concedidas (usado na tela de administração)
+export async function fetchAllUserPermissions(): Promise<DbUserPermission[]> {
+  const { data, error } = await client()
+    .from("user_permissions")
+    .select("*, modules(*)");
+  if (error) throw error;
+  return (data ?? []) as DbUserPermission[];
+}
+
+export async function grantPermission(userId: string, moduleId: string) {
+  const { error } = await client()
+    .from("user_permissions")
+    .upsert(
+      { user_id: userId, module_id: moduleId, pode_gerenciar: true },
+      { onConflict: "user_id,module_id" }
+    );
+  if (error) throw error;
+}
+
+export async function revokePermission(userId: string, moduleId: string) {
+  const { error } = await client()
+    .from("user_permissions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("module_id", moduleId);
+  if (error) throw error;
+}
+
+// ---------- Status dos colaboradores (Home) ----------
+
+export async function fetchUserStatuses(): Promise<DbUserStatus[]> {
+  const { data, error } = await client()
+    .from("user_status")
+    .select("*, users(*)")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbUserStatus[];
+}
+
+export async function upsertMyStatus(userId: string, status: CollaboratorStatus) {
+  const { error } = await client()
+    .from("user_status")
+    .upsert({ user_id: userId, status }, { onConflict: "user_id" });
+  if (error) throw error;
+}
+
+// ---------- Progresso de cursos ----------
+
+export async function fetchCourseProgressForUser(userId: string): Promise<DbCourseProgress[]> {
+  const { data, error } = await client()
+    .from("course_progress")
+    .select("*, courses(*)")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return (data ?? []) as DbCourseProgress[];
+}
+
+// ---------- Ranking do time (agregado, não expõe notas individuais cruas) ----------
+
+export async function fetchTeamRanking(inicio: Date, fim: Date): Promise<RankingRow[]> {
+  const { data, error } = await client().rpc("team_ranking", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data ?? []) as RankingRow[];
+}
+
+// ---------- Módulo CSAT (planilha + dashboard) ----------
+
+export interface CsatFilters {
+  busca?: string;
+  emailAtendente?: string;
+  canal?: string;
+  topico?: string;
+  categoriaCliente?: string;
+  nota?: number;
+  classificacaoCsat?: "Promotor" | "Neutro" | "Detrator";
+  inicio?: Date;
+  fim?: Date;
+  sortBy?: string;
+  sortAsc?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function fetchCsatFiltered(
+  filters: CsatFilters
+): Promise<{ rows: DbCsatResult[]; count: number }> {
+  const {
+    busca,
+    emailAtendente,
+    canal,
+    topico,
+    categoriaCliente,
+    nota,
+    classificacaoCsat,
+    inicio,
+    fim,
+    sortBy = "data_hora",
+    sortAsc = false,
+    page = 0,
+    pageSize = 10,
+  } = filters;
+
+  let query = client().from("csat_results").select("*", { count: "exact" });
+
+  if (busca) query = query.or(`comentario.ilike.%${busca}%,atendente.ilike.%${busca}%`);
+  if (emailAtendente) query = query.eq("email_atendente", emailAtendente);
+  if (canal) query = query.eq("canal", canal);
+  if (topico) query = query.eq("topico", topico);
+  if (categoriaCliente) query = query.eq("categoria_cliente", categoriaCliente);
+  if (nota) query = query.eq("nota", nota);
+  if (classificacaoCsat) query = query.eq("classificacao_csat", classificacaoCsat);
+  if (inicio) query = query.gte("data_hora", inicio.toISOString());
+  if (fim) query = query.lte("data_hora", fim.toISOString());
+
+  query = query
+    .order(sortBy, { ascending: sortAsc })
+    .range(page * pageSize, page * pageSize + pageSize - 1);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { rows: (data ?? []) as DbCsatResult[], count: count ?? 0 };
+}
+
+// Sem paginação, para o dashboard e para exportação (mesmos filtros, sem limite)
+export async function fetchCsatForDashboard(
+  filters: Omit<CsatFilters, "page" | "pageSize" | "sortBy" | "sortAsc">
+): Promise<DbCsatResult[]> {
+  const { busca, emailAtendente, canal, topico, categoriaCliente, nota, classificacaoCsat, inicio, fim } =
+    filters;
+  let query = client().from("csat_results").select("*");
+
+  if (busca) query = query.or(`comentario.ilike.%${busca}%,atendente.ilike.%${busca}%`);
+  if (emailAtendente) query = query.eq("email_atendente", emailAtendente);
+  if (canal) query = query.eq("canal", canal);
+  if (topico) query = query.eq("topico", topico);
+  if (categoriaCliente) query = query.eq("categoria_cliente", categoriaCliente);
+  if (nota) query = query.eq("nota", nota);
+  if (classificacaoCsat) query = query.eq("classificacao_csat", classificacaoCsat);
+  if (inicio) query = query.gte("data_hora", inicio.toISOString());
+  if (fim) query = query.lte("data_hora", fim.toISOString());
+
+  const { data, error } = await query.order("data_hora", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbCsatResult[];
+}
+
+// ---------- Analytics avançado (agregados via função no Postgres) ----------
+
+export interface AnalyticsFilters {
+  inicio: Date;
+  fim: Date;
+  equipe?: string;
+  canal?: string;
+  categoriaCliente?: string;
+}
+
+export interface AnalyticsSummary {
+  total_avaliacoes: number;
+  media_csat: number | null;
+  media_csat_10: number | null;
+  percentual_satisfacao: number | null;
+  tempo_1resposta_medio: number | null;
+  tempo_encerramento_medio: number | null;
+}
+
+export async function fetchAnalyticsSummary(f: AnalyticsFilters): Promise<AnalyticsSummary | null> {
+  const { data, error } = await client().rpc("analytics_summary", {
+    data_inicio: f.inicio.toISOString(),
+    data_fim: f.fim.toISOString(),
+    p_equipe: f.equipe ?? null,
+    p_canal: f.canal ?? null,
+    p_categoria_cliente: f.categoriaCliente ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as AnalyticsSummary | null;
+}
+
+export async function fetchAnalyticsEvolucao(
+  f: AnalyticsFilters & { granularidade: "day" | "week" | "month" }
+): Promise<{ periodo: string; media_csat: number; total: number }[]> {
+  const { data, error } = await client().rpc("analytics_evolucao", {
+    data_inicio: f.inicio.toISOString(),
+    data_fim: f.fim.toISOString(),
+    granularidade: f.granularidade,
+    p_equipe: f.equipe ?? null,
+    p_canal: f.canal ?? null,
+    p_categoria_cliente: f.categoriaCliente ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as { periodo: string; media_csat: number; total: number }[];
+}
+
+export async function fetchTeamRankingFiltered(f: AnalyticsFilters): Promise<RankingRow[]> {
+  const { data, error } = await client().rpc("team_ranking_filtered", {
+    data_inicio: f.inicio.toISOString(),
+    data_fim: f.fim.toISOString(),
+    p_equipe: f.equipe ?? null,
+    p_canal: f.canal ?? null,
+    p_categoria_cliente: f.categoriaCliente ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as RankingRow[];
+}
+
+export async function fetchAtendenteAliases(): Promise<
+  { email_variante: string; email_canonico: string; nome_canonico: string }[]
+> {
+  const { data, error } = await client().from("atendente_aliases").select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchDistinctCanais(): Promise<string[]> {
+  const { data, error } = await client().rpc("distinct_canais");
+  if (error) throw error;
+  return (data ?? []).map((r: { canal: string }) => r.canal);
+}
+
+export interface OperadorFilters {
+  inicio: Date;
+  fim: Date;
+  canal?: string;
+  estado?: string;
+}
+
+export interface OperadorRankingRow {
+  atendente: string;
+  email_atendente: string | null;
+  user_id: string | null;
+  total_chamados: number;
+  tempo_1resposta_medio: number | null;
+  tempo_encerramento_medio: number | null;
+  csat_medio: number | null;
+  total_avaliacoes: number;
+  posicao: number;
+}
+
+export async function fetchOperadorRanking(f: OperadorFilters): Promise<OperadorRankingRow[]> {
+  const { data, error } = await client().rpc("operador_ranking", {
+    data_inicio: f.inicio.toISOString(),
+    data_fim: f.fim.toISOString(),
+    p_canal: f.canal ?? null,
+    p_estado: f.estado ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as OperadorRankingRow[];
+}
+
+export interface DistribuicaoRow {
+  chave: string;
+  total: number;
+}
+
+export async function fetchDistribuicaoCanal(
+  inicio: Date,
+  fim: Date,
+  estado?: string
+): Promise<DistribuicaoRow[]> {
+  const { data, error } = await client().rpc("distribuicao_canal", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_estado: estado ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DistribuicaoRow[];
+}
+
+export async function fetchDistribuicaoStatus(
+  inicio: Date,
+  fim: Date,
+  canal?: string
+): Promise<DistribuicaoRow[]> {
+  const { data, error } = await client().rpc("distribuicao_status", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DistribuicaoRow[];
+}
+
+export async function fetchDistribuicaoTopico(
+  inicio: Date,
+  fim: Date,
+  canal?: string,
+  estado?: string
+): Promise<DistribuicaoRow[]> {
+  const { data, error } = await client().rpc("distribuicao_topico", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+    p_estado: estado ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as DistribuicaoRow[];
+}
+
+export async function fetchDistinctOperadores(): Promise<{ atendente: string; email_atendente: string }[]> {
+  const { data, error } = await client()
+    .from("csat_results")
+    .select("atendente, email_atendente")
+    .not("atendente", "is", null);
+  if (error) throw error;
+  const vistos = new Set<string>();
+  const unicos: { atendente: string; email_atendente: string }[] = [];
+  (data ?? []).forEach((r) => {
+    const chave = r.email_atendente ?? r.atendente;
+    if (chave && !vistos.has(chave)) {
+      vistos.add(chave);
+      unicos.push({ atendente: r.atendente, email_atendente: r.email_atendente });
+    }
+  });
+  return unicos.sort((a, b) => a.atendente.localeCompare(b.atendente));
+}
+
+// ---------- Reclame Aqui ----------
+
+export interface ReclameAquiFilters {
+  status?: string;
+  responsavelId?: string;
+  inicio?: Date;
+  fim?: Date;
+}
+
+export async function fetchReclameAquiCases(
+  filters: ReclameAquiFilters = {}
+): Promise<DbReclameAquiCase[]> {
+  let query = client()
+    .from("reclame_aqui_cases")
+    .select("*, responsavel:users!reclame_aqui_cases_responsavel_id_fkey(*)");
+
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.responsavelId) query = query.eq("responsavel_id", filters.responsavelId);
+  if (filters.inicio) query = query.gte("data_abertura", filters.inicio.toISOString());
+  if (filters.fim) query = query.lte("data_abertura", filters.fim.toISOString());
+
+  const { data, error } = await query.order("data_abertura", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbReclameAquiCase[];
+}
+
+export async function upsertReclameAquiCase(
+  c: Partial<DbReclameAquiCase> & { id?: string }
+) {
+  const { data, error } = await client().from("reclame_aqui_cases").upsert(c).select().single();
+  if (error) throw error;
+  return data as DbReclameAquiCase;
+}
+
+export async function deleteReclameAquiCase(id: string) {
+  const { error } = await client().from("reclame_aqui_cases").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchReclameAquiMetrics(): Promise<DbReclameAquiMetric[]> {
+  const { data, error } = await client()
+    .from("reclame_aqui_metrics")
+    .select("*")
+    .order("data");
+  if (error) throw error;
+  return (data ?? []) as DbReclameAquiMetric[];
+}
+
+// ---------- NPS ----------
+
+export interface NpsFilters {
+  classificacao?: "Promotor" | "Neutro" | "Detrator";
+  fonte?: string;
+  busca?: string;
+  inicio?: Date;
+  fim?: Date;
+}
+
+export async function fetchNpsResponses(filters: NpsFilters = {}): Promise<DbNpsResponse[]> {
+  let query = client().from("nps_responses").select("*");
+
+  if (filters.classificacao) query = query.eq("classificacao", filters.classificacao);
+  if (filters.fonte) query = query.eq("fonte", filters.fonte);
+  if (filters.busca) query = query.or(`comentario.ilike.%${filters.busca}%,respondente.ilike.%${filters.busca}%`);
+  if (filters.inicio) query = query.gte("data_resposta", filters.inicio.toISOString());
+  if (filters.fim) query = query.lte("data_resposta", filters.fim.toISOString());
+
+  const { data, error } = await query.order("data_resposta", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbNpsResponse[];
+}
+
+export async function upsertNpsResponse(r: Partial<DbNpsResponse> & { id?: string }) {
+  const { data, error } = await client().from("nps_responses").upsert(r).select().single();
+  if (error) throw error;
+  return data as DbNpsResponse;
+}
+
+export async function deleteNpsResponse(id: string) {
+  const { error } = await client().from("nps_responses").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- crisp_conversations (fonte principal de atendimento) ----------
+
+export interface DashboardAtendimentoSummary {
+  total_conversas: number;
+  conversas_resolvidas: number;
+  tfr_medio_min: number | null;
+  tempo_resolucao_medio_min: number | null;
+  csat_medio: number | null;
+  percentual_satisfacao: number | null;
+}
+
+export async function fetchDashboardAtendimentoSummary(
+  inicio: Date,
+  fim: Date
+): Promise<DashboardAtendimentoSummary | null> {
+  const { data, error } = await client().rpc("dashboard_atendimento_summary", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as DashboardAtendimentoSummary | null;
+}
+
+export async function fetchConversasEvolucao(
+  inicio: Date,
+  fim: Date,
+  granularidade: "day" | "week" | "month"
+): Promise<{ periodo: string; total: number; resolvidas: number }[]> {
+  const { data, error } = await client().rpc("conversas_evolucao", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    granularidade,
+  });
+  if (error) throw error;
+  return (data ?? []) as { periodo: string; total: number; resolvidas: number }[];
+}
+
+export interface AtendentePerformanceRow {
+  operator_nome: string;
+  operator_email: string | null;
+  total_atendimentos: number;
+  tfr_medio: number | null;
+  tempo_resolucao_medio: number | null;
+  csat_medio: number | null;
+  total_avaliacoes: number;
+  posicao: number;
+}
+
+export async function fetchAtendentePerformance(
+  inicio: Date,
+  fim: Date,
+  canal?: string,
+  status?: string
+): Promise<AtendentePerformanceRow[]> {
+  const { data, error } = await client().rpc("atendente_performance", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+    p_status: status ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as AtendentePerformanceRow[];
+}
+
+export async function fetchDistribuicaoCanalConversas(inicio: Date, fim: Date): Promise<DistribuicaoRow[]> {
+  const { data, error } = await client().rpc("distribuicao_canal_conversas", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data ?? []) as DistribuicaoRow[];
+}
+
+export async function fetchDistribuicaoStatusConversas(inicio: Date, fim: Date): Promise<DistribuicaoRow[]> {
+  const { data, error } = await client().rpc("distribuicao_status_conversas", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data ?? []) as DistribuicaoRow[];
+}
+
+export async function fetchCsatTempoRespostaCorrelacao(
+  inicio: Date,
+  fim: Date
+): Promise<{ nota: number; first_response_time_minutes: number | null; resolution_time_minutes: number | null }[]> {
+  const { data, error } = await client().rpc("csat_tempo_resposta_correlacao", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data ?? []) as { nota: number; first_response_time_minutes: number | null; resolution_time_minutes: number | null }[];
+}
+
+export interface ConversaNotaBaixa {
+  crisp_id: string | null;
+  cliente_nome: string | null;
+  operator_nome: string | null;
+  canal: string | null;
+  topico: string | null;
+  nota: number;
+  comentario: string | null;
+  started_at: string;
+}
+
+export async function fetchConversasNotaBaixa(inicio: Date, fim: Date, limite = 2): Promise<ConversaNotaBaixa[]> {
+  const { data, error } = await client().rpc("conversas_nota_baixa", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    limite_nota: limite,
+  });
+  if (error) throw error;
+  return (data ?? []) as ConversaNotaBaixa[];
+}
+
+export interface ConversasFilters {
+  busca?: string;
+  atendenteEmail?: string;
+  canal?: string;
+  tipoCliente?: string;
+  status?: string;
+  inicio?: Date;
+  fim?: Date;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function fetchConversasFiltered(
+  filters: ConversasFilters
+): Promise<{ rows: DbCrispConversation[]; count: number }> {
+  const { busca, atendenteEmail, canal, tipoCliente, status, inicio, fim, page = 0, pageSize = 15 } = filters;
+  let query = client().from("crisp_conversations").select("*", { count: "exact" });
+
+  if (busca) query = query.or(`cliente_nome.ilike.%${busca}%,cliente_email.ilike.%${busca}%`);
+  if (atendenteEmail) query = query.eq("operator_email", atendenteEmail);
+  if (canal) query = query.eq("canal", canal);
+  if (tipoCliente) query = query.ilike("tipo_cliente", `%${tipoCliente}%`);
+  if (status) query = query.eq("status", status);
+  if (inicio) query = query.gte("started_at", inicio.toISOString());
+  if (fim) query = query.lte("started_at", fim.toISOString());
+
+  query = query.order("started_at", { ascending: false }).range(page * pageSize, page * pageSize + pageSize - 1);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { rows: (data ?? []) as DbCrispConversation[], count: count ?? 0 };
+}
+
+export async function fetchDistinctAtendentesConversas(): Promise<{ nome: string; email: string }[]> {
+  const { data, error } = await client()
+    .from("crisp_conversations")
+    .select("operator_nome, operator_email")
+    .not("operator_email", "is", null);
+  if (error) throw error;
+  const vistos = new Set<string>();
+  const unicos: { nome: string; email: string }[] = [];
+  (data ?? []).forEach((r) => {
+    if (r.operator_email && !vistos.has(r.operator_email)) {
+      vistos.add(r.operator_email);
+      unicos.push({ nome: r.operator_nome ?? r.operator_email, email: r.operator_email });
+    }
+  });
+  return unicos.sort((a, b) => a.nome.localeCompare(b.nome));
+}
+
+export async function fetchDistinctTiposCliente(): Promise<{ label: string; tag: string }[]> {
+  // tipo_cliente no banco é uma lista de tags separadas por vírgula
+  // (ex: "seller, ia", "vendedor, whatsapp, mrgreenn"), não um valor único.
+  // Por isso o filtro usa correspondência por tag (ILIKE), não igualdade exata.
+  return [
+    { label: "Final", tag: "final" },
+    { label: "Consumidor", tag: "consumidor" },
+    { label: "Seller", tag: "seller" },
+    { label: "Produtor", tag: "vendedor" },
+    { label: "SDR", tag: "sdr" },
+    { label: "Bluee", tag: "bluee" },
+  ];
+}
+
+// ---------- Helpdesks ----------
+
+export const HELPDESK_LINK_PREFIX = "https://greenn.crisp.help/pt-br/";
+
+export async function fetchHelpdesks(): Promise<DbHelpdesk[]> {
+  const { data, error } = await client()
+    .from("helpdesks")
+    .select("*, solicitante:users!helpdesks_created_by_fkey(*), aprovador:users!helpdesks_approved_by_fkey(*)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbHelpdesk[];
+}
+
+export async function requestHelpdesk(payload: {
+  nome: string;
+  descricao: string;
+  link?: string;
+  created_by: string;
+}) {
+  const { data, error } = await client()
+    .from("helpdesks")
+    .insert({ ...payload, status: "solicitando" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbHelpdesk;
+}
+
+export async function updateHelpdeskStatus(
+  id: string,
+  status: DbHelpdesk["status"],
+  approvedBy?: string,
+  link?: string
+) {
+  const updates: Partial<DbHelpdesk> = { status };
+  if (approvedBy) updates.approved_by = approvedBy;
+  if (link) updates.link = link;
+  const { data, error } = await client().from("helpdesks").update(updates).eq("id", id).select().single();
+  if (error) throw error;
+  return data as DbHelpdesk;
+}
+
+export async function deleteHelpdesk(id: string) {
+  const { error } = await client().from("helpdesks").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------- Escala de sábado ----------
+
+export interface EscalaSabadoItem {
+  id: string;
+  posicao: number;
+  user_id: string;
+  users?: { nome: string } | null;
+}
+
+export async function fetchMyHorario(userId: string) {
+  const { data, error } = await client()
+    .from("users")
+    .select("horario_entrada, horario_saida_almoco, horario_retorno_almoco, horario_saida")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMyHorario(
+  userId: string,
+  horario: {
+    horario_entrada: string;
+    horario_saida_almoco: string;
+    horario_retorno_almoco: string;
+    horario_saida: string;
+  }
+) {
+  const { error } = await client().from("users").update(horario).eq("id", userId);
+  if (error) throw error;
+}
+
+export async function fetchEscalaSabado(): Promise<EscalaSabadoItem[]> {
+  const { data, error } = await client()
+    .from("escala_sabado")
+    .select("*, users(nome)")
+    .order("posicao");
+  if (error) throw error;
+  return (data ?? []) as EscalaSabadoItem[];
+}
+
+export async function upsertEscalaSabadoItem(posicao: number, userId: string) {
+  const { error } = await client()
+    .from("escala_sabado")
+    .upsert({ posicao, user_id: userId }, { onConflict: "posicao" });
+  if (error) throw error;
+}
+
+export async function removeEscalaSabadoItem(id: string) {
+  const { error } = await client().from("escala_sabado").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function fetchAtendenteEscaladoSabado(data: string): Promise<{ user_id: string; nome: string } | null> {
+  const { data: rows, error } = await client().rpc("atendente_escalado_sabado", { p_data: data });
+  if (error) throw error;
+  return rows?.[0] ?? null;
+}
+
+// ---------- Upload de imagem de ferramenta (Outros Links) ----------
+
+export async function uploadToolImage(file: File): Promise<string> {
+  const c = client();
+  const ext = file.name.split(".").pop();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await c.storage.from("tool-images").upload(path, file, { upsert: false });
+  if (error) throw error;
+  const { data } = c.storage.from("tool-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ---------- Calendário ----------
+
+export interface DbHoliday {
+  id: string;
+  data: string;
+  nome: string;
+}
+
+export async function fetchHolidays(inicio: string, fim: string): Promise<DbHoliday[]> {
+  const { data, error } = await client()
+    .from("calendar_holidays")
+    .select("*")
+    .gte("data", inicio)
+    .lte("data", fim)
+    .order("data");
+  if (error) throw error;
+  return (data ?? []) as DbHoliday[];
+}
+
+export async function fetchNextHoliday(fromDate: string): Promise<DbHoliday | null> {
+  const { data, error } = await client()
+    .from("calendar_holidays")
+    .select("*")
+    .gte("data", fromDate)
+    .order("data")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export interface DbWeekResponsible {
+  id: string;
+  semana_inicio: string;
+  user_id: string | null;
+  usuario?: { nome: string } | null;
+}
+
+export async function fetchWeekResponsibles(inicio: string, fim: string): Promise<DbWeekResponsible[]> {
+  const { data, error } = await client()
+    .from("calendar_week_responsibles")
+    .select("*, usuario:users(nome)")
+    .gte("semana_inicio", inicio)
+    .lte("semana_inicio", fim);
+  if (error) throw error;
+  return (data ?? []) as DbWeekResponsible[];
+}
+
+export async function upsertWeekResponsible(semanaInicio: string, userId: string, criadoPor: string) {
+  const { error } = await client()
+    .from("calendar_week_responsibles")
+    .upsert({ semana_inicio: semanaInicio, user_id: userId, created_by: criadoPor }, { onConflict: "semana_inicio" });
+  if (error) throw error;
+}
+
+export interface DbSaturdayOncall {
+  id: string;
+  data: string;
+  user_id: string | null;
+  horario_previsto: string | null;
+  observacao: string | null;
+  usuario?: { nome: string } | null;
+}
+
+export async function fetchSaturdayOncall(inicio: string, fim: string): Promise<DbSaturdayOncall[]> {
+  const { data, error } = await client()
+    .from("calendar_saturday_oncall")
+    .select("*, usuario:users(nome)")
+    .gte("data", inicio)
+    .lte("data", fim);
+  if (error) throw error;
+  return (data ?? []) as DbSaturdayOncall[];
+}
+
+export async function upsertSaturdayOncall(payload: {
+  data: string;
+  user_id: string;
+  horario_previsto?: string;
+  observacao?: string;
+  created_by: string;
+}) {
+  const { error } = await client()
+    .from("calendar_saturday_oncall")
+    .upsert(payload, { onConflict: "data" });
+  if (error) throw error;
+}
+
+export interface DbLeaveRequest {
+  id: string;
+  user_id: string;
+  data: string;
+  tipo: "folga" | "banco_horas" | "compensacao" | "outro";
+  motivo: string | null;
+  observacao: string | null;
+  status: "pendente" | "aprovada" | "reprovada";
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+  usuario?: { nome: string } | null;
+}
+
+export async function fetchLeaveRequests(inicio: string, fim: string): Promise<DbLeaveRequest[]> {
+  const { data, error } = await client()
+    .from("calendar_leave_requests")
+    .select("*, usuario:users(nome)")
+    .gte("data", inicio)
+    .lte("data", fim)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbLeaveRequest[];
+}
+
+export async function fetchPendingLeaveRequests(): Promise<DbLeaveRequest[]> {
+  const { data, error } = await client()
+    .from("calendar_leave_requests")
+    .select("*, usuario:users(nome)")
+    .eq("status", "pendente")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbLeaveRequest[];
+}
+
+export async function requestLeave(payload: {
+  user_id: string;
+  data: string;
+  tipo: DbLeaveRequest["tipo"];
+  motivo?: string;
+  observacao?: string;
+}) {
+  const { error } = await client().from("calendar_leave_requests").insert(payload);
+  if (error) throw error;
+}
+
+export async function decideLeaveRequest(id: string, status: "aprovada" | "reprovada", decidedBy: string) {
+  const { error } = await client()
+    .from("calendar_leave_requests")
+    .update({ status, decided_by: decidedBy, decided_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export interface DbOncall {
+  id: string;
+  data: string;
+  user_id: string;
+  horario_inicio: string;
+  horario_fim: string;
+  observacao: string | null;
+  usuario?: { nome: string } | null;
+}
+
+export async function fetchOncall(inicio: string, fim: string): Promise<DbOncall[]> {
+  const { data, error } = await client()
+    .from("calendar_oncall")
+    .select("*, usuario:users(nome)")
+    .gte("data", inicio)
+    .lte("data", fim);
+  if (error) throw error;
+  return (data ?? []) as DbOncall[];
+}
+
+export async function createOncall(payload: {
+  data: string;
+  user_id: string;
+  horario_inicio: string;
+  horario_fim: string;
+  observacao?: string;
+  created_by: string;
+}) {
+  const { error } = await client().from("calendar_oncall").insert(payload);
+  if (error) throw error;
+}
+
+export interface DbVacation {
+  id: string;
+  user_id: string;
+  data_inicio: string;
+  data_fim: string;
+  observacao: string | null;
+  usuario?: { nome: string } | null;
+}
+
+export async function fetchVacations(inicio: string, fim: string): Promise<DbVacation[]> {
+  const { data, error } = await client()
+    .from("calendar_vacations")
+    .select("*, usuario:users(nome)")
+    .lte("data_inicio", fim)
+    .gte("data_fim", inicio);
+  if (error) throw error;
+  return (data ?? []) as DbVacation[];
+}
+
+export async function createVacation(payload: {
+  user_id: string;
+  data_inicio: string;
+  data_fim: string;
+  observacao?: string;
+  created_by: string;
+}) {
+  const { error } = await client().from("calendar_vacations").insert(payload);
+  if (error) throw error;
+}
+
+export interface DbDayEntry {
+  id: string;
+  data: string;
+  titulo: string;
+  horas: number;
+  observacao: string | null;
+}
+
+export async function fetchDayEntries(inicio: string, fim: string): Promise<DbDayEntry[]> {
+  const { data, error } = await client()
+    .from("calendar_day_entries")
+    .select("*")
+    .gte("data", inicio)
+    .lte("data", fim);
+  if (error) throw error;
+  return (data ?? []) as DbDayEntry[];
+}
+
+export async function createDayEntry(payload: {
+  data: string;
+  titulo: string;
+  horas: number;
+  observacao?: string;
+  created_by: string;
+}) {
+  const { error } = await client().from("calendar_day_entries").insert(payload);
+  if (error) throw error;
+}
+
+export async function limparDia(data: string) {
+  await Promise.all([
+    client().from("calendar_week_responsibles").delete().eq("semana_inicio", data),
+    client().from("calendar_saturday_oncall").delete().eq("data", data),
+    client().from("calendar_oncall").delete().eq("data", data),
+    client().from("calendar_day_entries").delete().eq("data", data),
+    client().from("calendar_leave_requests").delete().eq("data", data),
+  ]);
+}
+
+// ---------- Métricas de atendimento corrigidas (1ª resposta humana, sem bot) ----------
+
+export interface AtendimentoComMetricas {
+  id: string;
+  crisp_id: string | null;
+  cliente_nome: string | null;
+  cliente_email: string | null;
+  operator_nome: string | null;
+  operator_email: string | null;
+  canal: string | null;
+  tipo_cliente: string | null;
+  status: string | null;
+  current_started_at: string;
+  primeira_resposta_humana_at: string | null;
+  resolved_at: string | null;
+  tempo_primeira_resposta_seg: number | null;
+  tempo_resolucao_seg: number | null;
+  invalido_resposta_antes_inicio: boolean;
+  invalido_sem_resposta_humana: boolean;
+  invalido_tempo_negativo: boolean;
+  link_chamado: string | null;
+  total_count: number;
+}
+
+export interface AtendimentosMetricasFilters {
+  inicio: Date;
+  fim: Date;
+  canal?: string;
+  tipoCliente?: string;
+  atendenteEmail?: string;
+  busca?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function fetchAtendimentosComMetricas(
+  f: AtendimentosMetricasFilters
+): Promise<{ rows: AtendimentoComMetricas[]; count: number }> {
+  const { page = 0, pageSize = 15 } = f;
+  const { data, error } = await client().rpc("atendimentos_com_metricas", {
+    data_inicio: f.inicio.toISOString(),
+    data_fim: f.fim.toISOString(),
+    p_canal: f.canal ?? null,
+    p_tipo_cliente: f.tipoCliente ?? null,
+    p_atendente_email: f.atendenteEmail ?? null,
+    p_busca: f.busca ?? null,
+    p_limit: pageSize,
+    p_offset: page * pageSize,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as AtendimentoComMetricas[];
+  return { rows, count: rows[0]?.total_count ?? 0 };
+}
+
+export interface MinhaConversaMetrica {
+  crisp_id: string | null;
+  current_started_at: string;
+  primeira_resposta_humana_at: string | null;
+  resolved_at: string | null;
+  tempo_primeira_resposta_seg: number | null;
+  tempo_resolucao_seg: number | null;
+  status: string | null;
+}
+
+export async function fetchMinhasConversasMetricas(inicio: Date, fim: Date): Promise<MinhaConversaMetrica[]> {
+  const { data, error } = await client().rpc("minhas_conversas_metricas", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+  });
+  if (error) throw error;
+  return (data ?? []) as MinhaConversaMetrica[];
+}
