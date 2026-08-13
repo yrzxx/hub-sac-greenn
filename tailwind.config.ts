@@ -58,7 +58,6 @@ export default {
       fontFamily: {
         display: ["'Inter'", "system-ui", "sans-serif"],
         body: ["'Inter'", "system-ui", "sans-serif"],
-        mono: ["'IBM Plex Mono'", "monospace"],
       },
       fontSize: {
         display: ["2rem", { lineHeight: "1.25", fontWeight: "700" }],

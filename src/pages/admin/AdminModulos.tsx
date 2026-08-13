@@ -3,13 +3,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, LayoutGrid } from "lucide-react";
+import { Plus, Pencil, Trash2, LayoutGrid } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { fetchModules, upsertModule } from "@/services/api";
+import { fetchModules, upsertModule, deleteModule } from "@/services/api";
 import type { DbModule } from "@/types/database";
 
 const schema = z.object({
@@ -53,6 +54,15 @@ export default function AdminModulos() {
     finally { setSalvando(false); }
   }
 
+  async function remover(m: DbModule) {
+    if (!confirm(`Excluir o módulo "${m.nome}"? Isso também remove qualquer permissão granular concedida para o slug "${m.slug}".`)) return;
+    setErro(null);
+    try {
+      await deleteModule(m.id);
+      await queryClient.invalidateQueries({ queryKey: ["modules"] });
+    } catch (err) { setErro(err instanceof Error ? err.message : "Não foi possível excluir."); }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3 rounded-2xl border border-dashed border-sand-line bg-sand-bg/60 p-4">
@@ -87,8 +97,9 @@ export default function AdminModulos() {
                   <td className="px-4 py-3">{m.mostrar_sidebar ? "sim" : "não"}</td>
                   <td className="px-4 py-3">{m.mostrar_home ? "sim" : "não"}</td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
                       <button onClick={() => abrirEdicao(m)} className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/50 hover:bg-sand-bg hover:text-ink"><Pencil size={15} /></button>
+                      <button onClick={() => remover(m)} className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/50 hover:bg-rust-500/10 hover:text-rust-500"><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>
@@ -98,8 +109,7 @@ export default function AdminModulos() {
         </Card>
       )}
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">{editando ? "Editar módulo" : "Novo módulo"}</h2>
             <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3">
               <div>
@@ -137,8 +147,7 @@ export default function AdminModulos() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { Target, Plus, Trash2, Coins, Hand } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/contexts/AuthContext";
@@ -326,8 +327,7 @@ export default function Missoes() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)} className="max-w-lg max-h-[90vh] overflow-y-auto">
             <h2 className="font-display text-base font-semibold text-ink">
               {editando ? "Editar missão" : "Nova missão"}
             </h2>
@@ -379,13 +379,11 @@ export default function Missoes() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
 
       {detalhe && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setDetalhe(null)}>
-          <Card className="w-full max-w-md p-5 shadow-float" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() => setDetalhe(null)}>
             <div className="flex items-start justify-between gap-2">
               <h2 className="font-display text-base font-semibold text-ink">{detalhe.titulo}</h2>
               {detalhe.dificuldade && <Badge tone={dificuldadeTone[detalhe.dificuldade]}>{detalhe.dificuldade}</Badge>}
@@ -401,8 +399,7 @@ export default function Missoes() {
             <div className="mt-5 flex justify-end">
               <Button variant="secondary" onClick={() => setDetalhe(null)}>Fechar</Button>
             </div>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

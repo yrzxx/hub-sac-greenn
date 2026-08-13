@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, CalendarDays, Users, Clock, Palmtree,
   X, Check, Trash2, Plus, AlertCircle,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CardSkeleton } from "@/components/ui/Skeleton";

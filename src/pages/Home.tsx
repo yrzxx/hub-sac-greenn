@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -10,12 +11,42 @@ import {
   ChevronRight,
   PieChart,
   Database,
+  PhoneCall,
+  CheckCircle2,
+  Timer,
+  Star,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Kpi } from "@/components/ui/Kpi";
 import { CollaboratorsOnline } from "@/components/CollaboratorsOnline";
-import { fetchAnnouncements, fetchMissionProgress } from "@/services/api";
+import { useRealtimeConversas } from "@/hooks/useRealtimeConversas";
+import {
+  fetchAnnouncements,
+  fetchMissionProgress,
+  fetchDashboardAtendimentoSummary,
+  fetchConversasEvolucao,
+} from "@/services/api";
+import { resolvePeriodo, periodoAnterior } from "@/lib/dateRanges";
+import { formatDurationFromMinutes } from "@/lib/formatDuration";
+
+function EvolucaoChamadosChart({ data }: { data: { label: string; value: number }[] }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="flex h-24 items-end gap-1 overflow-x-auto">
+      {data.map((d, i) => (
+        <div key={`${d.label}-${i}`} className="flex min-w-[18px] flex-1 flex-col items-center gap-1">
+          <div
+            className="w-full rounded-t-md bg-forest-500"
+            style={{ height: `${(d.value / max) * 100}%`, minHeight: 3 }}
+          />
+          <span className="text-[9px] text-ink/40">{d.label.slice(5)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const quickAccess = [
   { to: "/missoes", label: "Missões", desc: "Acompanhe suas metas do mês", icon: Target },
@@ -43,8 +74,36 @@ function getSaudacao() {
 }
 
 export default function Home() {
-  const { user } = useAuth();
+  useRealtimeConversas();
+  const { user, isAdmin } = useAuth();
   const primeiroNome = user?.nome.split(" ")[0] ?? "";
+
+  const { inicio, fim } = useMemo(() => resolvePeriodo("30dias"), []);
+  const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(
+    () => periodoAnterior(inicio, fim),
+    [inicio, fim]
+  );
+
+  const { data: dashboard, isLoading: loadingDashboard } = useQuery({
+    queryKey: ["dashboard-atendimento", inicio, fim],
+    queryFn: () => fetchDashboardAtendimentoSummary(inicio, fim),
+    enabled: isAdmin,
+  });
+  const { data: dashboardAnterior } = useQuery({
+    queryKey: ["dashboard-atendimento", inicioAnterior, fimAnterior],
+    queryFn: () => fetchDashboardAtendimentoSummary(inicioAnterior, fimAnterior),
+    enabled: isAdmin,
+  });
+  const { data: evolucao, isLoading: loadingEvolucao } = useQuery({
+    queryKey: ["conversas-evolucao", inicio, fim, "day"],
+    queryFn: () => fetchConversasEvolucao(inicio, fim, "day"),
+    enabled: isAdmin,
+  });
+
+  function delta(atual?: number | null, anterior?: number | null) {
+    if (!atual || !anterior) return undefined;
+    return ((atual - anterior) / anterior) * 100;
+  }
 
   const { data: announcements, isLoading: loadingAnnouncements } = useQuery({
     queryKey: ["announcements", "home"],
@@ -76,6 +135,58 @@ export default function Home() {
           })}
         </p>
       </div>
+
+      {isAdmin && (
+        <div>
+          <h2 className="mb-3 font-display text-sm font-semibold text-ink">
+            Atendimento (últimos 30 dias)
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <Kpi
+              label="Total de conversas"
+              value={loadingDashboard ? "..." : String(dashboard?.total_conversas ?? 0)}
+              delta={delta(dashboard?.total_conversas, dashboardAnterior?.total_conversas)}
+              icon={PhoneCall}
+            />
+            <Kpi
+              label="Conversas resolvidas"
+              value={loadingDashboard ? "..." : String(dashboard?.conversas_resolvidas ?? 0)}
+              delta={delta(dashboard?.conversas_resolvidas, dashboardAnterior?.conversas_resolvidas)}
+              icon={CheckCircle2}
+            />
+            <Kpi
+              label="TFR médio"
+              value={loadingDashboard ? "..." : formatDurationFromMinutes(dashboard?.tfr_medio_min ?? null)}
+              delta={delta(dashboard?.tfr_medio_min, dashboardAnterior?.tfr_medio_min)}
+              invertDeltaColor
+              icon={Timer}
+            />
+            <Kpi
+              label="Tempo médio de resolução"
+              value={loadingDashboard ? "..." : formatDurationFromMinutes(dashboard?.tempo_resolucao_medio_min ?? null)}
+              delta={delta(dashboard?.tempo_resolucao_medio_min, dashboardAnterior?.tempo_resolucao_medio_min)}
+              invertDeltaColor
+              icon={Timer}
+            />
+            <Kpi
+              label="CSAT médio"
+              value={loadingDashboard ? "..." : dashboard?.csat_medio?.toFixed(1) ?? "—"}
+              delta={delta(dashboard?.csat_medio, dashboardAnterior?.csat_medio)}
+              icon={Star}
+            />
+          </div>
+          <Card className="mt-4 p-5">
+            <p className="mb-2 text-xs font-medium text-ink/50">Evolução diária de conversas</p>
+            {loadingEvolucao ? (
+              <p className="text-sm text-ink/50">Carregando...</p>
+            ) : !evolucao || evolucao.length === 0 ? (
+              <p className="text-sm text-ink/50">Sem dados no período.</p>
+            ) : (
+              <EvolucaoChamadosChart data={evolucao.map((e) => ({ label: e.periodo, value: e.total }))} />
+            )}
+          </Card>
+        </div>
+      )}
 
       <CollaboratorsOnline />
 

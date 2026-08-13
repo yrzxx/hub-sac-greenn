@@ -72,6 +72,20 @@ build`), `npm run preview`, `npm run lint` (ESLint — mas não há arquivo de
 config `.eslintrc` visível no repo raiz; conferir antes de assumir que
 `lint` funciona sem setup adicional).
 
+**Requisito de Node**: Vite 8 exige Node moderno (18+); Node 12 do sistema
+(se for o caso do seu ambiente) faz o próprio `tsc` falhar ao carregar
+(`SyntaxError` no operador `??`). Use `nvm install 20 && nvm use 20` antes
+de rodar `npm install`/`npm run build` se encontrar esse erro.
+
+**Conflito de peer dependency conhecido**: `package.json` tem `"vite":
+"^8.2.1"` mas `"@vitejs/plugin-react": "^4.3.1"`, cujo peer range é `vite
+^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0` — não cobre vite 8. `npm install`
+puro falha com `ERESOLVE`; hoje só instala com `npm install
+--legacy-peer-deps`. O build funciona assim na prática, mas vale decidir
+conscientemente entre atualizar `@vitejs/plugin-react` para uma versão que
+suporte vite 8, ou fixar vite em uma major anterior — não foi uma decisão
+tomada, é um estado encontrado.
+
 ## 4. Estrutura das pastas
 
 ```
@@ -359,8 +373,13 @@ Todos em `src/components/ui/`:
   plataforma (presets de `dateRanges.ts` + intervalo personalizado); usar
   este em vez de reinventar um seletor de data em página nova.
 - **`SegmentedControl<T>`** — grupo compacto de opções (ex: granularidade
-  diária/semanal/mensal). ⚠️ Está implementado mas **não está sendo usado
-  em nenhuma tela hoje** — ver ROADMAP.md antes de assumir que está em uso.
+  diária/semanal/mensal, abas internas de página). Em uso em Analytics,
+  CSAT, Atualizações e Reclame Aqui.
+- **`Dialog`** — wrapper padrão para modais (`onClose` + conteúdo livre),
+  substitui o markup `fixed inset-0 ... bg-ink/40` + `<Card>` que era
+  replicado manualmente em ~11 páginas. Fecha com Escape ou clique no
+  backdrop, e expõe `role="dialog"`/`aria-modal`. Usar sempre este
+  componente para novos modais — não recriar o markup manual.
 
 Fora de `ui/`: `components/layout/Sidebar.tsx` e `Header.tsx` (chrome fixo,
 ver seção 6 para a lógica de seções por permissão),
@@ -437,11 +456,11 @@ ver seção 6 para a lógica de seções por permissão),
 - **Layout de página**: container global `max-w-[1600px]` centralizado
   (`AppLayout.tsx`), sidebar fixa recolhível (72px colapsada, 240px
   expandida, expande no hover ou fixada por clique).
-- **Modais**: sempre `fixed inset-0 z-50 flex items-center justify-center
-  bg-ink/40 p-4` + `<Card className="w-full max-w-md p-5 shadow-float">`
-  (ajustar `max-w-*` conforme o formulário). Não há um componente `<Dialog>`
-  genérico — o padrão é replicado manualmente em cada página (oportunidade
-  de extração, ver ROADMAP.md).
+- **Modais**: usar `<Dialog onClose={...}>` (`src/components/ui/Dialog.tsx`)
+  envolvido pelo `{condicao && <Dialog>...}` do estado local — não recriar o
+  markup `fixed inset-0 ... bg-ink/40` manualmente. Passe `className` para
+  ajustar `max-w-*`/altura quando o formulário for maior que o padrão
+  (`max-w-md`).
 - **Empty state, loading e erro**: sempre `EmptyState`, `Skeleton`/
   `CardSkeleton`, e mensagem de erro inline em `text-rust-500` — não usar
   `alert()`/spinners genéricos.
@@ -587,9 +606,9 @@ cadastrado em `public.modules` — conferir antes de assumir.
   (dados de exemplo, sem integração real ainda).
 - NPS: score automático, classificação gerada pelo Postgres, evolução
   mensal, CRUD (dados de exemplo, sem integração real ainda).
-- Painel Administrativo unificado: CRUD completo para Usuários, Perfis,
-  Permissões, Módulos, Cursos, Documentação, Atualizações, Outros Links
-  (delete não implementado na UI para Módulos/Perfis — ver ROADMAP.md).
+- Painel Administrativo unificado: CRUD completo (incluindo exclusão) para
+  Usuários, Perfis, Permissões, Módulos, Cursos, Documentação,
+  Atualizações, Outros Links.
 - Atendimentos e Performance (admin-only) sobre `crisp_conversations`
   real, com filtros e Realtime.
 - Correção de métricas de 1ª resposta para considerar só resposta humana
@@ -603,6 +622,22 @@ cadastrado em `public.modules` — conferir antes de assumir.
   admin, geração automática de Atualização ao concluir.
 - Notificação sonora + badge de não lidas em tempo real (sino do Header).
 - Exportação CSV (CSAT) e PDF (dashboard CSAT).
+- Dashboard de atendimento na Home (5 cards + evolução diária, admin-only),
+  usando `fetchDashboardAtendimentoSummary`/`fetchConversasEvolucao` que
+  antes existiam em `api.ts` sem nenhuma tela consumindo.
+- Exclusão (delete) wired na UI de Administração → Módulos, → Perfis e em
+  Helpdesks (funções já existiam em `api.ts`, sem botão correspondente).
+- Reunião de Resultados usando tempo médio de resolução real
+  (`crisp_conversations`, via `fetchMinhasConversasMetricas`), substituindo
+  o aviso de "tempo não registrado".
+- Componente `Dialog` (`src/components/ui/Dialog.tsx`) extraído e adotado
+  em todos os modais da aplicação (Escape, clique no backdrop,
+  `aria-modal`).
+- Build de produção (`npm run build`) verificado ponta a ponta pela
+  primeira vez neste projeto — corrigidos os erros de tipo que o `tsc -b`
+  nunca tinha rodado a tempo de pegar (closures de `supabase` possivelmente
+  nulo nos hooks `useRealtime*`, campo `email` faltante em `DbCsatResult`,
+  imports não usados, inferência de tipo em `fetchMyPermissions`).
 
 ## 20. Funcionalidades pendentes
 

@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Search, Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchAllAnnouncements, upsertAnnouncement, deleteAnnouncement } from "@/services/api";
@@ -104,8 +105,7 @@ export default function AdminAtualizacoes() {
         </Card>
       )}
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">{editando ? "Editar comunicado" : "Novo comunicado"}</h2>
             <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3">
               <div>
@@ -146,8 +146,7 @@ export default function AdminAtualizacoes() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

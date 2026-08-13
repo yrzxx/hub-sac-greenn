@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Gauge, Plus, Pencil, Trash2, Smile, Meh, Frown } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Kpi } from "@/components/ui/Kpi";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchNpsResponses, upsertNpsResponse, deleteNpsResponse } from "@/services/api";
@@ -260,8 +261,7 @@ export default function Nps() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">
               {editando ? "Editar resposta" : "Nova resposta"}
             </h2>
@@ -296,13 +296,11 @@ export default function Nps() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
 
       {detalhe && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setDetalhe(null)}>
-          <Card className="w-full max-w-md p-5 shadow-float" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() => setDetalhe(null)}>
             <div className="flex items-start justify-between gap-2">
               <h2 className="font-display text-base font-semibold text-ink">
                 {detalhe.respondente ?? "Anônimo"}
@@ -347,8 +345,7 @@ export default function Nps() {
             <div className="mt-5 flex justify-end">
               <Button variant="secondary" onClick={() => setDetalhe(null)}>Fechar</Button>
             </div>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

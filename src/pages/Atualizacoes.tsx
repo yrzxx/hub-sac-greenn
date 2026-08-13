@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Megaphone, Target } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchAnnouncements } from "@/services/api";
@@ -15,13 +16,13 @@ const prioridadeTone = {
 } as const;
 
 const abas = [
-  { valor: "todas", label: "Todas" },
-  { valor: "gerais", label: "Gerais" },
-  { valor: "missao", label: "Missões" },
+  ["todas", "Todas"],
+  ["gerais", "Gerais"],
+  ["missao", "Missões"],
 ] as const;
 
 export default function Atualizacoes() {
-  const [aba, setAba] = useState<(typeof abas)[number]["valor"]>("todas");
+  const [aba, setAba] = useState<(typeof abas)[number][0]>("todas");
 
   const { data: announcements, isLoading } = useQuery({
     queryKey: ["announcements", "full"],
@@ -46,20 +47,7 @@ export default function Atualizacoes() {
             Feed interno de avisos, novidades e novas missões.
           </p>
         </div>
-        <div className="flex gap-1 rounded-xl bg-sand-bg p-1">
-          {abas.map((a) => (
-            <button
-              key={a.valor}
-              onClick={() => setAba(a.valor)}
-              className={
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors " +
-                (aba === a.valor ? "bg-white shadow-sm text-ink" : "text-ink/50")
-              }
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl options={abas} value={aba} onChange={setAba} />
       </div>
 
       {isLoading ? (

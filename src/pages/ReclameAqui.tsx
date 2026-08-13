@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Kpi } from "@/components/ui/Kpi";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
@@ -194,20 +196,11 @@ export default function ReclameAqui() {
           <h1 className="font-display text-display text-ink">Reclame Aqui</h1>
           <p className="mt-1 text-sm text-ink/60">Reputação, reclamações e simulador de metas.</p>
         </div>
-        <div className="flex gap-1 rounded-xl bg-sand-bg p-1">
-          {(["dashboard", "reclamacoes", "simulador"] as const).map((a) => (
-            <button
-              key={a}
-              onClick={() => setAba(a)}
-              className={
-                "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors " +
-                (aba === a ? "bg-white shadow-sm text-ink" : "text-ink/50")
-              }
-            >
-              {a === "reclamacoes" ? "Reclamações" : a}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={[["dashboard", "Dashboard"], ["reclamacoes", "Reclamações"], ["simulador", "Simulador"]] as const}
+          value={aba}
+          onChange={setAba}
+        />
       </div>
 
       {erro && <p className="text-sm text-rust-500">{erro}</p>}
@@ -344,8 +337,7 @@ export default function ReclameAqui() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">
               {editando ? "Editar reclamação" : "Nova reclamação"}
             </h2>
@@ -385,8 +377,7 @@ export default function ReclameAqui() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

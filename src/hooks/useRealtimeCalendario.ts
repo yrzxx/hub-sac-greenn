@@ -16,8 +16,9 @@ export function useRealtimeCalendario() {
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
-    const channel = supabase.channel("calendario-changes");
+    const channel = sb.channel("calendario-changes");
     TABELAS.forEach((tabela) => {
       channel.on("postgres_changes", { event: "*", schema: "public", table: tabela }, () => {
         queryClient.invalidateQueries({ queryKey: ["calendario"] });
@@ -26,7 +27,7 @@ export function useRealtimeCalendario() {
     channel.subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [queryClient]);
 }

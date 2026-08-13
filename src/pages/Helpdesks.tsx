@@ -3,12 +3,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Wrench, Plus, ExternalLink } from "lucide-react";
+import { Wrench, Plus, ExternalLink, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Dialog } from "@/components/ui/Dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeHelpdesks } from "@/hooks/useRealtimeHelpdesks";
@@ -16,6 +17,7 @@ import {
   fetchHelpdesks,
   requestHelpdesk,
   updateHelpdeskStatus,
+  deleteHelpdesk,
   HELPDESK_LINK_PREFIX,
 } from "@/services/api";
 import type { DbHelpdesk } from "@/types/database";
@@ -111,6 +113,18 @@ export default function Helpdesks() {
       setLinkParaFinalizar(null);
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não foi possível finalizar.");
+    }
+  }
+
+  async function remover(h: DbHelpdesk) {
+    if (!confirm(`Excluir a solicitação "${h.nome}"? Essa ação não pode ser desfeita.`)) return;
+    setErro(null);
+    try {
+      await deleteHelpdesk(h.id);
+      await queryClient.invalidateQueries({ queryKey: ["helpdesks"] });
+      setDetalhe(null);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível excluir.");
     }
   }
 
@@ -235,8 +249,7 @@ export default function Helpdesks() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">Solicitar novo Helpdesk</h2>
             <p className="mt-1 text-xs text-ink/50">
               O link será definido pelo administrador apenas na finalização.
@@ -258,13 +271,11 @@ export default function Helpdesks() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Enviando..." : "Enviar solicitação"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
 
       {linkParaFinalizar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => { setLinkParaFinalizar(null); setErro(null); }}>
             <h2 className="font-display text-base font-semibold text-ink">Finalizar Helpdesk</h2>
             <p className="mt-1 text-xs text-ink/50">
               Informe o link oficial para concluir "{linkParaFinalizar.h.nome}".
@@ -283,13 +294,11 @@ export default function Helpdesks() {
               <Button variant="secondary" onClick={() => { setLinkParaFinalizar(null); setErro(null); }}>Cancelar</Button>
               <Button onClick={confirmarFinalizacao}>Finalizar</Button>
             </div>
-          </Card>
-        </div>
+        </Dialog>
       )}
 
       {detalhe && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setDetalhe(null)}>
-          <Card className="w-full max-w-md p-5 shadow-float" onClick={(e) => e.stopPropagation()}>
+        <Dialog onClose={() => setDetalhe(null)}>
             <div className="flex items-start justify-between gap-2">
               <h2 className="font-display text-base font-semibold text-ink">{detalhe.nome}</h2>
               <Badge tone="neutral">{statusLabel[detalhe.status]}</Badge>
@@ -315,11 +324,18 @@ export default function Helpdesks() {
                 ))}
               </div>
             )}
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center justify-between">
+              {podeGerenciar ? (
+                <button
+                  onClick={() => remover(detalhe)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-rust-500 hover:underline"
+                >
+                  <Trash2 size={13} /> Excluir
+                </button>
+              ) : <span />}
               <Button variant="secondary" onClick={() => setDetalhe(null)}>Fechar</Button>
             </div>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

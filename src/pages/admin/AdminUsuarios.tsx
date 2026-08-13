@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Search, Users as UsersIcon } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchUsers, fetchRoles, upsertUser, deleteUser } from "@/services/api";
@@ -203,8 +204,7 @@ export default function AdminUsuarios() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">
               {editando ? "Editar usuário" : "Novo usuário"}
             </h2>
@@ -290,8 +290,7 @@ export default function AdminUsuarios() {
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

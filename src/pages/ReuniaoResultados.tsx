@@ -8,7 +8,25 @@ import { Kpi } from "@/components/ui/Kpi";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchCsatForUser, fetchRRHistory, insertRRHistory } from "@/services/api";
+import {
+  fetchCsatForUser,
+  fetchRRHistory,
+  insertRRHistory,
+  fetchMinhasConversasMetricas,
+} from "@/services/api";
+import { formatDuration } from "@/lib/formatDuration";
+
+function media(vals: (number | null)[]) {
+  const validos = vals.filter((v): v is number => v !== null);
+  return validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+}
+
+function limitesDoMes(periodoId: string) {
+  const [ano, mes] = periodoId.split("-").map(Number);
+  const inicio = new Date(ano, mes - 1, 1);
+  const fim = new Date(ano, mes, 0, 23, 59, 59, 999);
+  return { inicio, fim };
+}
 
 function ultimosPeriodos(n: number) {
   const hoje = new Date();
@@ -71,6 +89,33 @@ export default function ReuniaoResultados() {
     ? ((atual.total - anterior.total) / anterior.total) * 100
     : 0;
 
+  const { inicio: inicioMes, fim: fimMes } = useMemo(() => limitesDoMes(periodo), [periodo]);
+  const { inicio: inicioMesAnterior, fim: fimMesAnterior } = useMemo(() => limitesDoMes(anteriorId), [anteriorId]);
+
+  const { data: conversas, isLoading: loadingConversas } = useQuery({
+    queryKey: ["minhas-conversas-metricas", user?.email, periodo],
+    queryFn: () => fetchMinhasConversasMetricas(inicioMes, fimMes),
+    enabled: Boolean(user?.email),
+  });
+  const { data: conversasAnterior } = useQuery({
+    queryKey: ["minhas-conversas-metricas", user?.email, anteriorId],
+    queryFn: () => fetchMinhasConversasMetricas(inicioMesAnterior, fimMesAnterior),
+    enabled: Boolean(user?.email),
+  });
+
+  const tempoResolucaoSeg = useMemo(
+    () => media((conversas ?? []).map((c) => c.tempo_resolucao_seg)),
+    [conversas]
+  );
+  const tempoResolucaoAnteriorSeg = useMemo(
+    () => media((conversasAnterior ?? []).map((c) => c.tempo_resolucao_seg)),
+    [conversasAnterior]
+  );
+  const tempoResolucaoDelta =
+    tempoResolucaoSeg !== null && tempoResolucaoAnteriorSeg
+      ? ((tempoResolucaoSeg - tempoResolucaoAnteriorSeg) / tempoResolucaoAnteriorSeg) * 100
+      : undefined;
+
   const {
     register,
     handleSubmit,
@@ -90,8 +135,8 @@ export default function ReuniaoResultados() {
         csat_variacao: Number(csatDelta.toFixed(1)),
         atendimentos: atual.total,
         atendimentos_variacao: Number(atendimentosDelta.toFixed(1)),
-        tempo_medio: null,
-        tempo_medio_variacao: null,
+        tempo_medio: tempoResolucaoSeg !== null ? formatDuration(tempoResolucaoSeg) : null,
+        tempo_medio_variacao: tempoResolucaoDelta !== undefined ? Number(tempoResolucaoDelta.toFixed(1)) : null,
         meta_batida: atual.media >= 4.5,
         aprendizados: data.aprendizados,
         dificuldades: data.dificuldades,
@@ -136,7 +181,7 @@ export default function ReuniaoResultados() {
         </select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Kpi
           label="CSAT do período"
           value={loadingCsat ? "..." : atual.media.toFixed(1)}
@@ -146,6 +191,12 @@ export default function ReuniaoResultados() {
           label="Atendimentos avaliados"
           value={loadingCsat ? "..." : String(atual.total)}
           delta={anterior.total ? atendimentosDelta : undefined}
+        />
+        <Kpi
+          label="Tempo médio de resolução"
+          value={loadingConversas ? "..." : formatDuration(tempoResolucaoSeg)}
+          delta={tempoResolucaoDelta}
+          invertDeltaColor
         />
       </div>
 
@@ -158,10 +209,11 @@ export default function ReuniaoResultados() {
             {atual.media >= 4.5 ? "Meta batida (CSAT ≥ 4.5)" : "Meta não atingida"}
           </Badge>
         </div>
-        <p className="mt-2 text-xs text-ink/50">
-          Tempo médio de atendimento ainda não é registrado no schema atual —
-          reservado para quando a integração com o Crisp estiver ativa.
-        </p>
+        {tempoResolucaoSeg === null && !loadingConversas && (
+          <p className="mt-2 text-xs text-ink/50">
+            Sem conversas com resolução registrada neste período em <code>crisp_conversations</code>.
+          </p>
+        )}
       </Card>
 
       <Card>

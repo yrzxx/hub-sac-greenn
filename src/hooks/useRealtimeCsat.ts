@@ -12,8 +12,9 @@ export function useRealtimeCsat() {
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
-    const channel = supabase
+    const channel = sb
       .channel("csat-results-changes")
       .on(
         "postgres_changes",
@@ -31,7 +32,7 @@ export function useRealtimeCsat() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [queryClient]);
 }

@@ -15,8 +15,9 @@ export function useRealtimeAnnouncementsNotifier() {
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
-    const channel = supabase
+    const channel = sb
       .channel("announcements-notifier")
       .on(
         "postgres_changes",
@@ -30,7 +31,7 @@ export function useRealtimeAnnouncementsNotifier() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [queryClient, registrarNovaAtualizacao]);
 }

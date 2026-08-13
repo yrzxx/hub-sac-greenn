@@ -14,7 +14,6 @@ import type {
   DbUserStatus,
   CollaboratorStatus,
   DbCourseProgress,
-  RankingRow,
   DbReclameAquiCase,
   DbReclameAquiMetric,
   DbNpsResponse,
@@ -194,16 +193,6 @@ export async function deleteDocumentation(id: string) {
 
 // ---------- Missões ----------
 
-export async function fetchMissions(): Promise<DbMission[]> {
-  const { data, error } = await client()
-    .from("missions")
-    .select("*")
-    .eq("ativo", true)
-    .order("prazo");
-  if (error) throw error;
-  return (data ?? []) as DbMission[];
-}
-
 // Para quem tem permissão de gerenciar Missões: traz todas, ativas ou não
 export async function fetchAllMissions(): Promise<DbMission[]> {
   const { data, error } = await client()
@@ -250,22 +239,6 @@ export async function fetchCsatForUser(email: string): Promise<DbCsatResult[]> {
     .order("data_hora", { ascending: false });
   if (error) throw error;
   return (data ?? []) as DbCsatResult[];
-}
-
-export async function fetchCsatTeamAverage(): Promise<{ media: number; total: number }> {
-  const { data, error } = await client().from("csat_results").select("nota");
-  if (error) throw error;
-  const notas = (data ?? []).map((d) => d.nota).filter((n): n is number => n !== null);
-  const media = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
-  return { media, total: notas.length };
-}
-
-export async function fetchTeamCsatMonthly(): Promise<
-  { mes: string; media: number; total: number }[]
-> {
-  const { data, error } = await client().rpc("team_csat_monthly");
-  if (error) throw error;
-  return (data ?? []) as { mes: string; media: number; total: number }[];
 }
 
 // ---------- Reunião de Resultados ----------
@@ -329,7 +302,11 @@ export async function fetchMyPermissions(userId: string): Promise<string[]> {
     .eq("pode_gerenciar", true);
   if (error) throw error;
   return (data ?? [])
-    .map((row: { modules?: { slug: string | null } | null }) => row.modules?.slug)
+    .map((row) => {
+      const modules = row.modules as { slug: string | null } | { slug: string | null }[] | null;
+      const modulo = Array.isArray(modules) ? modules[0] : modules;
+      return modulo?.slug;
+    })
     .filter((s): s is string => Boolean(s));
 }
 
@@ -388,17 +365,6 @@ export async function fetchCourseProgressForUser(userId: string): Promise<DbCour
     .eq("user_id", userId);
   if (error) throw error;
   return (data ?? []) as DbCourseProgress[];
-}
-
-// ---------- Ranking do time (agregado, não expõe notas individuais cruas) ----------
-
-export async function fetchTeamRanking(inicio: Date, fim: Date): Promise<RankingRow[]> {
-  const { data, error } = await client().rpc("team_ranking", {
-    data_inicio: inicio.toISOString(),
-    data_fim: fim.toISOString(),
-  });
-  if (error) throw error;
-  return (data ?? []) as RankingRow[];
 }
 
 // ---------- Módulo CSAT (planilha + dashboard) ----------
@@ -526,18 +492,6 @@ export async function fetchAnalyticsEvolucao(
   });
   if (error) throw error;
   return (data ?? []) as { periodo: string; media_csat: number; total: number }[];
-}
-
-export async function fetchTeamRankingFiltered(f: AnalyticsFilters): Promise<RankingRow[]> {
-  const { data, error } = await client().rpc("team_ranking_filtered", {
-    data_inicio: f.inicio.toISOString(),
-    data_fim: f.fim.toISOString(),
-    p_equipe: f.equipe ?? null,
-    p_canal: f.canal ?? null,
-    p_categoria_cliente: f.categoriaCliente ?? null,
-  });
-  if (error) throw error;
-  return (data ?? []) as RankingRow[];
 }
 
 export async function fetchAtendenteAliases(): Promise<
@@ -814,18 +768,6 @@ export async function fetchDistribuicaoStatusConversas(inicio: Date, fim: Date):
   });
   if (error) throw error;
   return (data ?? []) as DistribuicaoRow[];
-}
-
-export async function fetchCsatTempoRespostaCorrelacao(
-  inicio: Date,
-  fim: Date
-): Promise<{ nota: number; first_response_time_minutes: number | null; resolution_time_minutes: number | null }[]> {
-  const { data, error } = await client().rpc("csat_tempo_resposta_correlacao", {
-    data_inicio: inicio.toISOString(),
-    data_fim: fim.toISOString(),
-  });
-  if (error) throw error;
-  return (data ?? []) as { nota: number; first_response_time_minutes: number | null; resolution_time_minutes: number | null }[];
 }
 
 export interface ConversaNotaBaixa {

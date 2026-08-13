@@ -3,12 +3,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
-import { fetchRoles, upsertRole } from "@/services/api";
+import { fetchRoles, upsertRole, deleteRole } from "@/services/api";
+
+const PERFIS_BASE = ["Administrador", "Colaborador"];
 
 const schema = z.object({
   nome: z.string().min(1, "Informe o nome do perfil"),
@@ -47,6 +50,15 @@ export default function AdminPerfis() {
     finally { setSalvando(false); }
   }
 
+  async function remover(r: Role) {
+    if (!confirm(`Excluir o perfil "${r.nome}"? Usuários com esse perfil ficam sem perfil vinculado.`)) return;
+    setErro(null);
+    try {
+      await deleteRole(r.id);
+      await queryClient.invalidateQueries({ queryKey: ["roles"] });
+    } catch (err) { setErro(err instanceof Error ? err.message : "Não foi possível excluir."); }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3 rounded-2xl border border-dashed border-sand-line bg-sand-bg/60 p-4">
@@ -74,6 +86,9 @@ export default function AdminPerfis() {
                   <div className="flex items-center gap-2">
                     <Badge tone={r.nome === "Administrador" ? "brand" : "neutral"}>{r.nome}</Badge>
                     <button onClick={() => abrirEdicao(r)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink/50 hover:bg-sand-bg hover:text-ink"><Pencil size={14} /></button>
+                    {!PERFIS_BASE.includes(r.nome) && (
+                      <button onClick={() => remover(r)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink/50 hover:bg-rust-500/10 hover:text-rust-500"><Trash2 size={14} /></button>
+                    )}
                   </div>
                 </div>
                 <p className="mt-1 text-sm text-ink/60">{r.descricao}</p>
@@ -83,8 +98,7 @@ export default function AdminPerfis() {
         </div>
       )}
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">{editando ? "Editar perfil" : "Novo perfil"}</h2>
             <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3">
               <div>
@@ -101,8 +115,7 @@ export default function AdminPerfis() {
                 <Button type="submit" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

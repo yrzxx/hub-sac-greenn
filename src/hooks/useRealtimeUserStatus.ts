@@ -12,8 +12,9 @@ export function useRealtimeUserStatus() {
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
-    const channel = supabase
+    const channel = sb
       .channel("user-status-changes")
       .on(
         "postgres_changes",
@@ -25,7 +26,7 @@ export function useRealtimeUserStatus() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [queryClient]);
 }

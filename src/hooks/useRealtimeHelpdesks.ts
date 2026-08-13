@@ -7,8 +7,9 @@ export function useRealtimeHelpdesks() {
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
-    const channel = supabase
+    const channel = sb
       .channel("helpdesks-changes")
       .on(
         "postgres_changes",
@@ -21,7 +22,7 @@ export function useRealtimeHelpdesks() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      sb.removeChannel(channel);
     };
   }, [queryClient]);
 }

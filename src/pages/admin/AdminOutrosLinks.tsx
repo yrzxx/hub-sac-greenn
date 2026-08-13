@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Search, Link2 as Link2Icon } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchAllTools, upsertTool, deleteTool, uploadToolImage } from "@/services/api";
@@ -195,7 +196,7 @@ export default function AdminOutrosLinks() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-forest-50 text-forest-600">
-                        <DynamicIcon name={t.icone} size={15} />
+                        <DynamicIcon name={t.icone ?? undefined} size={15} />
                       </div>
                       <div>
                         <p className="font-medium text-ink">{t.nome}</p>
@@ -234,8 +235,7 @@ export default function AdminOutrosLinks() {
       )}
 
       {dialogAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <Card className="w-full max-w-md p-5 shadow-float">
+        <Dialog onClose={() => setDialogAberto(false)}>
             <h2 className="font-display text-base font-semibold text-ink">
               {editando ? "Editar link" : "Novo link"}
             </h2>
@@ -362,8 +362,7 @@ export default function AdminOutrosLinks() {
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Dialog>
       )}
     </div>
   );

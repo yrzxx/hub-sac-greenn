@@ -112,6 +112,7 @@ export interface DbCsatResult {
   atendente: string;
   email_atendente: string | null;
   cliente: string | null;
+  email: string | null;
   nota: number | null;
   comentario: string | null;
   canal: string | null;
@@ -133,16 +134,6 @@ export interface DbCourseProgress {
   concluded_at: string | null;
   updated_at: string;
   courses?: DbCourse;
-}
-
-export interface RankingRow {
-  user_id: string;
-  nome: string;
-  cargo: string | null;
-  equipe: string | null;
-  media: number;
-  total: number;
-  posicao: number;
 }
 
 export type CollaboratorStatus =

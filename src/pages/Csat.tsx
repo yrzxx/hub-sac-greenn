@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Kpi } from "@/components/ui/Kpi";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchDistinctOperadores, fetchCsatFiltered, fetchCsatForDashboard, fetchAtendenteAliases } from "@/services/api";
@@ -143,20 +144,11 @@ export default function Csat() {
             Planilha completa e dashboard por colaborador, com filtros e exportação.
           </p>
         </div>
-        <div className="flex gap-1 rounded-xl bg-sand-bg p-1">
-          {(["planilha", "dashboard"] as const).map((a) => (
-            <button
-              key={a}
-              onClick={() => setAba(a)}
-              className={
-                "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors " +
-                (aba === a ? "bg-white shadow-sm text-ink" : "text-ink/50")
-              }
-            >
-              {a}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={[["planilha", "Planilha"], ["dashboard", "Dashboard"]] as const}
+          value={aba}
+          onChange={setAba}
+        />
       </div>
 
       <DateRangePopover

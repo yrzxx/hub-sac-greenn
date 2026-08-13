@@ -6,6 +6,7 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Kpi } from "@/components/ui/Kpi";
 import { Badge } from "@/components/ui/Badge";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeCsat } from "@/hooks/useRealtimeCsat";
@@ -178,13 +179,11 @@ export default function Analytics() {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 p-5 pb-0">
           <h2 className="font-display text-sm font-semibold text-ink">Evolução de chamados e CSAT</h2>
-          <div className="flex gap-1 rounded-lg bg-sand-bg p-1">
-            {([["day", "Diária"], ["week", "Semanal"], ["month", "Mensal"]] as const).map(([v, label]) => (
-              <button key={v} onClick={() => setGranularidade(v)} className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors " + (granularidade === v ? "bg-white shadow-sm text-ink" : "text-ink/50")}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={[["day", "Diária"], ["week", "Semanal"], ["month", "Mensal"]] as const}
+            value={granularidade}
+            onChange={setGranularidade}
+          />
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-2">
           <div>
