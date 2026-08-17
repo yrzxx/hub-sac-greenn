@@ -7,12 +7,13 @@ import { RequireAuth } from "@/routes/RequireAuth";
 import { RequirePermission } from "@/routes/RequirePermission";
 
 import Login from "@/pages/Login";
+import DefinirSenha from "@/pages/DefinirSenha";
 import Home from "@/pages/Home";
 import Csat from "@/pages/Csat";
 import ReclameAqui from "@/pages/ReclameAqui";
 import Nps from "@/pages/Nps";
-import Atendimentos from "@/pages/Atendimentos";
 import Performance from "@/pages/Performance";
+import EmRisco from "@/pages/EmRisco";
 import Helpdesks from "@/pages/Helpdesks";
 import Calendario from "@/pages/Calendario";
 import MeuPainel from "@/pages/MeuPainel";
@@ -36,6 +37,7 @@ import AdminModulos from "@/pages/admin/AdminModulos";
 import AdminPerfis from "@/pages/admin/AdminPerfis";
 import AdminPermissoes from "@/pages/admin/AdminPermissoes";
 import AdminEscalas from "@/pages/admin/AdminEscalas";
+import AdminAtendenteAliases from "@/pages/admin/AdminAtendenteAliases";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="login" element={<Login />} />
+            <Route path="definir-senha" element={<DefinirSenha />} />
 
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
@@ -61,8 +64,8 @@ export default function App() {
                 <Route path="perfil" element={<Perfil />} />
 
                 <Route element={<AdminOnlyRoute />}>
-                  <Route path="atendimentos" element={<Atendimentos />} />
                   <Route path="performance" element={<Performance />} />
+                  <Route path="em-risco" element={<EmRisco />} />
                 </Route>
                 <Route path="helpdesks" element={<Helpdesks />} />
                 <Route path="calendario" element={<Calendario />} />
@@ -86,6 +89,7 @@ export default function App() {
                     <Route path="perfis" element={<AdminPerfis />} />
                     <Route path="permissoes" element={<AdminPermissoes />} />
                     <Route path="escalas" element={<AdminEscalas />} />
+                    <Route path="aliases" element={<AdminAtendenteAliases />} />
                     <Route path="modulos" element={<AdminModulos />} />
                     <Route path="cursos" element={<AdminCursos />} />
                     <Route path="documentacao" element={<AdminDocumentacao />} />

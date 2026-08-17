@@ -62,6 +62,30 @@ export async function deleteUser(id: string) {
   if (error) throw error;
 }
 
+export interface InviteUserInput {
+  email: string;
+  nome: string;
+  cargo?: string;
+  equipe?: string;
+  role_id: string;
+  horario_entrada: string;
+  horario_saida_almoco: string;
+  horario_retorno_almoco: string;
+  horario_saida: string;
+}
+
+// Convida um usuário novo: cria o acesso no Supabase Auth (manda e-mail de
+// convite pra pessoa definir a própria senha) e já vincula o auth_id em
+// public.users — tudo numa Edge Function, nunca expondo a service role key.
+export async function inviteUser(input: InviteUserInput): Promise<DbUser> {
+  const { data, error } = await client().functions.invoke("invite-user", {
+    body: { ...input, redirect_origin: window.location.origin },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data.user as DbUser;
+}
+
 export async function fetchRoles() {
   const { data, error } = await client().from("roles").select("*").order("nome");
   if (error) throw error;
@@ -220,6 +244,15 @@ export async function claimMission(missionId: string) {
   return data as DbMission;
 }
 
+export async function updateMyMissionProgress(missionId: string, atual: number) {
+  const { data, error } = await client().rpc("update_my_mission_progress", {
+    p_mission_id: missionId,
+    p_atual: atual,
+  });
+  if (error) throw error;
+  return data as DbMissionProgress;
+}
+
 export async function fetchMissionProgress(userId: string): Promise<DbMissionProgress[]> {
   const { data, error } = await client()
     .from("mission_progress")
@@ -261,6 +294,27 @@ export async function insertRRHistory(payload: Omit<DbRRHistory, "id" | "created
     .single();
   if (error) throw error;
   return data as DbRRHistory;
+}
+
+export async function updateRRHistory(
+  id: string,
+  payload: Partial<Pick<DbRRHistory, "aprendizados" | "dificuldades" | "plano_de_acao" | "objetivos">>
+) {
+  const { data, error } = await client()
+    .from("rr_history")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbRRHistory;
+}
+
+// Exclusão de RR é admin-only (policy rr_history_delete_admin) — quem
+// preencheu não pode apagar o próprio histórico, só corrigir via update.
+export async function deleteRRHistory(id: string) {
+  const { error } = await client().from("rr_history").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ---------- Permissões granulares ----------
@@ -354,6 +408,21 @@ export async function upsertMyStatus(userId: string, status: CollaboratorStatus)
     .from("user_status")
     .upsert({ user_id: userId, status }, { onConflict: "user_id" });
   if (error) throw error;
+}
+
+// Marca o usuário como "online" ao entrar no Hub, sem sobrescrever um status
+// que a própria pessoa já tenha escolhido manualmente (almoço, folga, férias,
+// plantão) — só assume quando não há registro ainda ou quando está "offline".
+export async function ensureOnlineStatus(userId: string) {
+  const { data, error } = await client()
+    .from("user_status")
+    .select("status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || data.status === "offline") {
+    await upsertMyStatus(userId, "online");
+  }
 }
 
 // ---------- Progresso de cursos ----------
@@ -494,12 +563,41 @@ export async function fetchAnalyticsEvolucao(
   return (data ?? []) as { periodo: string; media_csat: number; total: number }[];
 }
 
-export async function fetchAtendenteAliases(): Promise<
-  { email_variante: string; email_canonico: string; nome_canonico: string }[]
-> {
-  const { data, error } = await client().from("atendente_aliases").select("*");
+export interface DbAtendenteAlias {
+  id: string;
+  email_variante: string;
+  email_canonico: string;
+  nome_canonico: string;
+  created_at: string;
+}
+
+export async function fetchAtendenteAliases(): Promise<DbAtendenteAlias[]> {
+  const { data, error } = await client().from("atendente_aliases").select("*").order("nome_canonico");
   if (error) throw error;
   return data ?? [];
+}
+
+export async function upsertAtendenteAlias(input: {
+  id?: string;
+  email_variante: string;
+  email_canonico: string;
+  nome_canonico: string;
+}) {
+  const { id, ...campos } = input;
+  if (id) {
+    const { error } = await client().from("atendente_aliases").update(campos).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await client()
+    .from("atendente_aliases")
+    .upsert(campos, { onConflict: "email_variante" });
+  if (error) throw error;
+}
+
+export async function deleteAtendenteAlias(id: string) {
+  const { error } = await client().from("atendente_aliases").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function fetchDistinctCanais(): Promise<string[]> {
@@ -701,11 +799,13 @@ export interface DashboardAtendimentoSummary {
 
 export async function fetchDashboardAtendimentoSummary(
   inicio: Date,
-  fim: Date
+  fim: Date,
+  canal?: string
 ): Promise<DashboardAtendimentoSummary | null> {
   const { data, error } = await client().rpc("dashboard_atendimento_summary", {
     data_inicio: inicio.toISOString(),
     data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
   });
   if (error) throw error;
   return (data?.[0] ?? null) as DashboardAtendimentoSummary | null;
@@ -771,7 +871,7 @@ export async function fetchDistribuicaoStatusConversas(inicio: Date, fim: Date):
 }
 
 export interface ConversaNotaBaixa {
-  crisp_id: string | null;
+  id: string;
   cliente_nome: string | null;
   operator_nome: string | null;
   canal: string | null;
@@ -779,6 +879,7 @@ export interface ConversaNotaBaixa {
   nota: number;
   comentario: string | null;
   started_at: string;
+  link_chamado: string | null;
 }
 
 export async function fetchConversasNotaBaixa(inicio: Date, fim: Date, limite = 2): Promise<ConversaNotaBaixa[]> {
@@ -824,21 +925,24 @@ export async function fetchConversasFiltered(
   return { rows: (data ?? []) as DbCrispConversation[], count: count ?? 0 };
 }
 
-export async function fetchDistinctAtendentesConversas(): Promise<{ nome: string; email: string }[]> {
+export async function fetchDistinctAtendentesConversas(): Promise<{ nome: string }[]> {
   const { data, error } = await client()
     .from("crisp_conversations")
-    .select("operator_nome, operator_email")
-    .not("operator_email", "is", null);
+    .select("operator_nome")
+    .not("operator_nome", "is", null);
   if (error) throw error;
-  const vistos = new Set<string>();
-  const unicos: { nome: string; email: string }[] = [];
-  (data ?? []).forEach((r) => {
-    if (r.operator_email && !vistos.has(r.operator_email)) {
-      vistos.add(r.operator_email);
-      unicos.push({ nome: r.operator_nome ?? r.operator_email, email: r.operator_email });
-    }
-  });
-  return unicos.sort((a, b) => a.nome.localeCompare(b.nome));
+
+  // O Crisp às vezes manda o apelido curto ("Vittor") e às vezes o nome
+  // completo ("Vittor Fernandes") pra mesma pessoa, dependendo da mensagem.
+  // Junta variações num nome canônico (o mais longo) em vez de listar cru.
+  const brutos = Array.from(new Set((data ?? []).map((r) => r.operator_nome).filter((n): n is string => Boolean(n))));
+  const ordenados = [...brutos].sort((a, b) => b.length - a.length);
+  const canonicos: string[] = [];
+  for (const nome of ordenados) {
+    const jaCoberto = canonicos.some((c) => c.toLowerCase().includes(nome.toLowerCase()));
+    if (!jaCoberto) canonicos.push(nome);
+  }
+  return canonicos.sort((a, b) => a.localeCompare(b)).map((nome) => ({ nome }));
 }
 
 export async function fetchDistinctTiposCliente(): Promise<{ label: string; tag: string }[]> {
@@ -959,6 +1063,22 @@ export async function fetchAtendenteEscaladoSabado(data: string): Promise<{ user
   const { data: rows, error } = await client().rpc("atendente_escalado_sabado", { p_data: data });
   if (error) throw error;
   return rows?.[0] ?? null;
+}
+
+// Data de referência do rodízio de sábado: define a partir de qual sábado a
+// posição #1 da sequência começa a contar. Sem essa linha configurada, o
+// cálculo do rodízio não tem base e nunca escala ninguém.
+export async function fetchEscalaSabadoConfig(): Promise<string | null> {
+  const { data, error } = await client().from("escala_sabado_config").select("data_referencia").maybeSingle();
+  if (error) throw error;
+  return data?.data_referencia ?? null;
+}
+
+export async function upsertEscalaSabadoConfig(dataReferencia: string) {
+  const { error } = await client()
+    .from("escala_sabado_config")
+    .upsert({ id: true, data_referencia: dataReferencia }, { onConflict: "id" });
+  if (error) throw error;
 }
 
 // ---------- Upload de imagem de ferramenta (Outros Links) ----------
@@ -1244,10 +1364,14 @@ export interface AtendimentosMetricasFilters {
   fim: Date;
   canal?: string;
   tipoCliente?: string;
-  atendenteEmail?: string;
+  atendenteNome?: string;
   busca?: string;
   page?: number;
   pageSize?: number;
+  somenteRisco?: boolean;
+  ordenarPor?: "recentes" | "tempo_aberto" | "tfr" | "tempo_resolucao";
+  direcao?: "asc" | "desc";
+  status?: string;
 }
 
 export async function fetchAtendimentosComMetricas(
@@ -1259,10 +1383,14 @@ export async function fetchAtendimentosComMetricas(
     data_fim: f.fim.toISOString(),
     p_canal: f.canal ?? null,
     p_tipo_cliente: f.tipoCliente ?? null,
-    p_atendente_email: f.atendenteEmail ?? null,
+    p_atendente_nome: f.atendenteNome ?? null,
     p_busca: f.busca ?? null,
     p_limit: pageSize,
     p_offset: page * pageSize,
+    p_somente_risco: f.somenteRisco ?? false,
+    p_ordenar_por: f.ordenarPor ?? "recentes",
+    p_status: f.status ?? null,
+    p_direcao: f.direcao ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as AtendimentoComMetricas[];
