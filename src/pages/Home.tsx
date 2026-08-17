@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Kpi } from "@/components/ui/Kpi";
+import { BarChart } from "@/components/ui/BarChart";
 import { CollaboratorsOnline } from "@/components/CollaboratorsOnline";
 import { useRealtimeConversas } from "@/hooks/useRealtimeConversas";
 import {
@@ -31,21 +32,8 @@ import {
 import { resolvePeriodo, periodoAnterior } from "@/lib/dateRanges";
 import { formatDurationFromMinutes } from "@/lib/formatDuration";
 
-function EvolucaoChamadosChart({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div className="flex h-24 items-end gap-1 overflow-x-auto">
-      {data.map((d, i) => (
-        <div key={`${d.label}-${i}`} className="flex min-w-[18px] flex-1 flex-col items-center gap-1">
-          <div
-            className="w-full rounded-t-md bg-forest-500"
-            style={{ height: `${(d.value / max) * 100}%`, minHeight: 3 }}
-          />
-          <span className="text-[9px] text-ink/40">{d.label.slice(5)}</span>
-        </div>
-      ))}
-    </div>
-  );
+function corConversas() {
+  return "bg-forest-500";
 }
 
 const quickAccess = [
@@ -190,7 +178,11 @@ export default function Home() {
             ) : !evolucao || evolucao.length === 0 ? (
               <p className="text-sm text-ink/50">Sem dados no período.</p>
             ) : (
-              <EvolucaoChamadosChart data={evolucao.map((e) => ({ label: e.periodo, value: e.total }))} />
+              <BarChart
+                data={evolucao.map((e) => ({ label: e.periodo.slice(5), value: e.total, displayValue: String(e.total) }))}
+                getColorClass={corConversas}
+                height={128}
+              />
             )}
           </Card>
         </div>
