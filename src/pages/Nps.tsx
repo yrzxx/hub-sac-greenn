@@ -11,6 +11,7 @@ import { Kpi } from "@/components/ui/Kpi";
 import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BarChart } from "@/components/ui/BarChart";
 import { fetchNpsResponses, upsertNpsResponse, deleteNpsResponse } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type { DbNpsResponse } from "@/types/database";
@@ -28,23 +29,10 @@ const responseSchema = z.object({
 
 type ResponseForm = z.infer<typeof responseSchema>;
 
-function MiniBarChart({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(...data.map((d) => Math.abs(d.value)), 1);
-  return (
-    <div className="flex h-32 items-center gap-1.5 overflow-x-auto">
-      {data.map((d) => (
-        <div key={d.label} className="flex min-w-[32px] flex-1 flex-col items-center gap-1">
-          <div className="flex h-full w-full flex-col justify-center">
-            <div
-              className={"w-full rounded " + (d.value >= 0 ? "bg-forest-500" : "bg-rust-500")}
-              style={{ height: `${(Math.abs(d.value) / max) * 50}%`, marginTop: d.value < 0 ? "50%" : undefined }}
-            />
-          </div>
-          <span className="text-[9px] text-ink/40">{d.label}</span>
-        </div>
-      ))}
-    </div>
-  );
+function corBarraNps(value: number) {
+  if (value >= 70) return "bg-forest-500";
+  if (value >= 40) return "bg-amber-500";
+  return "bg-rust-500";
 }
 
 export default function Nps() {
@@ -154,10 +142,10 @@ export default function Nps() {
     });
     return Array.from(grupos.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([mes, g]) => ({
-        label: mes.slice(5),
-        value: Math.round(((g.promotores - g.detratores) / g.total) * 100),
-      }));
+      .map(([mes, g]) => {
+        const value = Math.round(((g.promotores - g.detratores) / g.total) * 100);
+        return { label: mes.slice(5), value, displayValue: `${value}%` };
+      });
   }, [respostas]);
 
 
@@ -189,7 +177,11 @@ export default function Nps() {
           <h2 className="font-display text-sm font-semibold text-ink">Evolução do NPS por mês</h2>
         </div>
         <div className="p-5">
-          {serieMensal.length === 0 ? <p className="text-sm text-ink/50">Sem dados suficientes.</p> : <MiniBarChart data={serieMensal} />}
+          {serieMensal.length === 0 ? (
+            <p className="text-sm text-ink/50">Sem dados suficientes.</p>
+          ) : (
+            <BarChart data={serieMensal} getColorClass={corBarraNps} />
+          )}
         </div>
       </Card>
 

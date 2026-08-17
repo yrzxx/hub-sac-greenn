@@ -12,6 +12,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BarChart, corPorFaixa } from "@/components/ui/BarChart";
 import {
   fetchUsers,
   fetchReclameAquiCases,
@@ -50,19 +51,8 @@ const caseSchema = z.object({
 
 type CaseForm = z.infer<typeof caseSchema>;
 
-function MiniLineChart({ data }: { data: { label: string; value: number }[] }) {
-  if (data.length === 0) return <p className="text-sm text-ink/50">Sem dados ainda.</p>;
-  const max = Math.max(...data.map((d) => d.value));
-  const min = Math.min(...data.map((d) => d.value));
-  const range = max - min || 1;
-  const points = data
-    .map((d, i) => `${(i / (data.length - 1 || 1)) * 100},${100 - ((d.value - min) / range) * 100}`)
-    .join(" ");
-  return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-32 w-full">
-      <polyline points={points} fill="none" stroke="#1F6F4F" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
+function corReputacao(value: number) {
+  return corPorFaixa(value, 8, 6);
 }
 
 export default function ReclameAqui() {
@@ -170,6 +160,7 @@ export default function ReclameAqui() {
   const serieReputacao = (metrics ?? []).map((m) => ({
     label: new Date(m.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
     value: m.nota_reputacao,
+    displayValue: m.nota_reputacao.toFixed(1),
   }));
 
   // Simulador
@@ -221,7 +212,11 @@ export default function ReclameAqui() {
               <h2 className="font-display text-sm font-semibold text-ink">Evolução da reputação</h2>
             </div>
             <div className="p-5">
-              <MiniLineChart data={serieReputacao} />
+              {serieReputacao.length === 0 ? (
+                <p className="text-sm text-ink/50">Sem dados ainda.</p>
+              ) : (
+                <BarChart data={serieReputacao} getColorClass={corReputacao} height={128} />
+              )}
             </div>
           </Card>
         </div>

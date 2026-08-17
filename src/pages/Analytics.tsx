@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/Card";
 import { Kpi } from "@/components/ui/Kpi";
 import { Badge } from "@/components/ui/Badge";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { BarChart, corPorFaixa } from "@/components/ui/BarChart";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeCsat } from "@/hooks/useRealtimeCsat";
@@ -18,6 +20,7 @@ import {
   fetchDistribuicaoStatus,
   fetchDistribuicaoTopico,
   fetchDistinctCanais,
+  fetchDashboardAtendimentoSummary,
 } from "@/services/api";
 import { resolvePeriodo, periodoAnterior, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
@@ -25,18 +28,14 @@ import { DateRangePopover } from "@/components/ui/DateRangePopover";
 
 const statusLabel: Record<string, string> = { resolved: "Resolvido", unresolved: "Pendente" };
 
-function MiniBarChart({ data, color }: { data: { label: string; value: number }[]; color: string }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div className="flex h-32 items-end gap-1 overflow-x-auto">
-      {data.map((d, i) => (
-        <div key={`${d.label}-${i}`} className="flex min-w-[24px] flex-1 flex-col items-center gap-1">
-          <div className="w-full rounded-t-md" style={{ height: `${(d.value / max) * 100}%`, backgroundColor: color, minHeight: 3 }} />
-          <span className="text-[9px] text-ink/40">{d.label.slice(5)}</span>
-        </div>
-      ))}
-    </div>
-  );
+type RankingCampo = "total_chamados" | "tempo_1resposta_medio" | "tempo_encerramento_medio" | "csat_medio";
+
+function corChamados() {
+  return "bg-sky-500";
+}
+
+function corCsatNota(value: number) {
+  return corPorFaixa(value, 4.5, 3.5);
 }
 
 function DistribuicaoBar({ data }: { data: { chave: string; total: number }[] }) {
@@ -68,6 +67,17 @@ export default function Analytics() {
   const [canal, setCanal] = useState("");
   const [estado, setEstado] = useState("");
   const [granularidade, setGranularidade] = useState<"day" | "week" | "month">("day");
+  const [rankingOrdenarPor, setRankingOrdenarPor] = useState<RankingCampo | undefined>(undefined);
+  const [rankingDirecao, setRankingDirecao] = useState<"asc" | "desc">("desc");
+
+  function ordenarRankingPorColuna(campo: RankingCampo) {
+    if (rankingOrdenarPor === campo) {
+      setRankingDirecao((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setRankingOrdenarPor(campo);
+      setRankingDirecao("desc");
+    }
+  }
 
   const { inicio, fim } = useMemo(() => resolvePeriodo(preset, personalizado), [preset, personalizado]);
   const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(() => periodoAnterior(inicio, fim), [inicio, fim]);
@@ -83,6 +93,17 @@ export default function Analytics() {
   const { data: summaryAnterior } = useQuery({
     queryKey: ["analytics-summary", { ...filtrosAnalytics, inicio: inicioAnterior, fim: fimAnterior }],
     queryFn: () => fetchAnalyticsSummary({ inicio: inicioAnterior, fim: fimAnterior, canal: canal || undefined }),
+  });
+
+  // "Total de chamados" precisa vir de crisp_conversations (todas as
+  // conversas, avaliadas ou não) — csat_results só tem as que receberam
+  // avaliação (hoje 5 linhas vs. 167+ conversas), então usar a mesma fonte
+  // para os dois KPIs fazia "Total de chamados" e "Total de avaliações"
+  // sempre baterem igual, mascarando o descompasso real entre as duas
+  // tabelas (ver decisão arquitetural no CLAUDE.md).
+  const { data: totalChamados, isLoading: loadingTotalChamados } = useQuery({
+    queryKey: ["dashboard-atendimento-summary", inicio, fim, canal],
+    queryFn: () => fetchDashboardAtendimentoSummary(inicio, fim, canal || undefined),
   });
 
   const { data: evolucaoCsat, isLoading: loadingEvolucao } = useQuery({
@@ -116,8 +137,23 @@ export default function Analytics() {
   const rankingFiltrado = operadorEmail ? (ranking ?? []).filter((r) => r.email_atendente === operadorEmail) : ranking ?? [];
   const destaque = ranking?.[0];
 
-  const serieChamados = (evolucaoCsat ?? []).map((e) => ({ label: e.periodo, value: e.total }));
-  const serieCsat = (evolucaoCsat ?? []).map((e) => ({ label: e.periodo, value: e.media_csat }));
+  const rankingOrdenado = useMemo(() => {
+    if (!rankingOrdenarPor) return rankingFiltrado;
+    const copia = [...rankingFiltrado];
+    copia.sort((a, b) => {
+      const av = a[rankingOrdenarPor] ?? -Infinity;
+      const bv = b[rankingOrdenarPor] ?? -Infinity;
+      return rankingDirecao === "asc" ? av - bv : bv - av;
+    });
+    return copia;
+  }, [rankingFiltrado, rankingOrdenarPor, rankingDirecao]);
+
+  const serieChamados = (evolucaoCsat ?? []).map((e) => ({ label: e.periodo.slice(5), value: e.total }));
+  const serieCsat = (evolucaoCsat ?? []).map((e) => ({
+    label: e.periodo.slice(5),
+    value: e.media_csat,
+    displayValue: e.media_csat.toFixed(1),
+  }));
 
   const totalDelta = summary && summaryAnterior && summaryAnterior.total_avaliacoes
     ? ((summary.total_avaliacoes - summaryAnterior.total_avaliacoes) / summaryAnterior.total_avaliacoes) * 100
@@ -162,17 +198,16 @@ export default function Analytics() {
       <div>
         <h2 className="mb-3 font-display text-sm font-semibold text-ink">Indicadores principais</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Kpi label="Total de chamados" value={loadingSummary ? "..." : String(summary?.total_avaliacoes ?? 0)} delta={totalDelta} icon={PhoneCall} />
-          <Kpi label="Total de avaliações" value={loadingSummary ? "..." : String(summary?.total_avaliacoes ?? 0)} icon={MessagesSquare} />
+          <Kpi label="Total de chamados" value={loadingTotalChamados ? "..." : String(totalChamados?.total_conversas ?? 0)} icon={PhoneCall} />
+          <Kpi label="Total de avaliações" value={loadingSummary ? "..." : String(summary?.total_avaliacoes ?? 0)} delta={totalDelta} icon={MessagesSquare} />
           <Kpi label="CSAT (nota média)" value={loadingSummary ? "..." : summary?.media_csat?.toFixed(1) ?? "—"} icon={Star} />
           <Kpi label="Satisfação" value={loadingSummary ? "..." : summary?.percentual_satisfacao !== null && summary?.percentual_satisfacao !== undefined ? `${summary.percentual_satisfacao}%` : "—"} icon={CheckCircle2} />
           <Kpi label="Tempo médio 1ª resposta" value={formatDuration(summary?.tempo_1resposta_medio ?? null)} icon={Timer} />
           <Kpi label="Tempo médio de encerramento" value={formatDuration(summary?.tempo_encerramento_medio ?? null)} icon={Timer} />
         </div>
         <p className="mt-2 text-xs text-ink/40">
-          "Total de chamados" e "Total de avaliações" ainda são o mesmo número: hoje só existe registro de
-          interações já avaliadas — não há uma tabela de chamados não avaliados. Tempos de resposta/encerramento
-          aparecem como "—" enquanto a integração que preenche esses campos não estiver ativa.
+          "Total de chamados" conta todas as conversas do período (avaliadas ou não); "Total de avaliações" conta
+          só as que receberam uma nota de CSAT — por isso os dois números normalmente são diferentes.
         </p>
       </div>
 
@@ -188,11 +223,11 @@ export default function Analytics() {
         <div className="grid gap-4 p-5 md:grid-cols-2">
           <div>
             <p className="mb-2 text-xs font-medium text-ink/50">Chamados</p>
-            {loadingEvolucao ? <p className="text-sm text-ink/50">Carregando...</p> : serieChamados.length === 0 ? <p className="text-sm text-ink/50">Sem dados.</p> : <MiniBarChart data={serieChamados} color="#E7A63C" />}
+            {loadingEvolucao ? <p className="text-sm text-ink/50">Carregando...</p> : serieChamados.length === 0 ? <p className="text-sm text-ink/50">Sem dados.</p> : <BarChart data={serieChamados} getColorClass={corChamados} height={128} />}
           </div>
           <div>
             <p className="mb-2 text-xs font-medium text-ink/50">CSAT médio</p>
-            {loadingEvolucao ? <p className="text-sm text-ink/50">Carregando...</p> : serieCsat.length === 0 ? <p className="text-sm text-ink/50">Sem dados.</p> : <MiniBarChart data={serieCsat} color="#1F6F4F" />}
+            {loadingEvolucao ? <p className="text-sm text-ink/50">Carregando...</p> : serieCsat.length === 0 ? <p className="text-sm text-ink/50">Sem dados.</p> : <BarChart data={serieCsat} getColorClass={corCsatNota} height={128} />}
           </div>
         </div>
       </Card>
@@ -247,14 +282,14 @@ export default function Analytics() {
                   <tr>
                     <th className="px-4 py-3 font-medium">#</th>
                     <th className="px-4 py-3 font-medium">Operador</th>
-                    <th className="px-4 py-3 font-medium">Chamados</th>
-                    <th className="px-4 py-3 font-medium">1ª resposta</th>
-                    <th className="px-4 py-3 font-medium">Encerramento</th>
-                    <th className="px-4 py-3 font-medium">CSAT (0–5)</th>
+                    <SortableHeader field="total_chamados" label="Chamados" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader field="tempo_1resposta_medio" label="1ª resposta" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader field="tempo_encerramento_medio" label="Encerramento" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader field="csat_medio" label="CSAT (0–5)" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                   </tr>
                 </thead>
                 <tbody>
-                  {rankingFiltrado.map((r) => (
+                  {rankingOrdenado.map((r) => (
                     <tr key={r.email_atendente ?? r.atendente} className="border-t border-sand-line">
                       <td className="px-4 py-3"><Badge tone={r.posicao === 1 ? "brand" : "neutral"}>#{r.posicao}</Badge></td>
                       <td className="px-4 py-3 font-medium text-ink">{r.atendente}{!r.user_id && <span className="ml-1 text-xs text-ink/40">(sem conta no Hub)</span>}</td>
