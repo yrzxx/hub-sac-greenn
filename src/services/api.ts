@@ -926,23 +926,14 @@ export async function fetchConversasFiltered(
 }
 
 export async function fetchDistinctAtendentesConversas(): Promise<{ nome: string }[]> {
-  const { data, error } = await client()
-    .from("crisp_conversations")
-    .select("operator_nome")
-    .not("operator_nome", "is", null);
+  // Antes juntava variações de nome ("Ana"/"Vittor") por substring no cliente,
+  // o que podia juntar pessoas DIFERENTES que compartilham apelido curto (ex:
+  // "Ana" era Ana Paula em algumas conversas e Ana Franca em outras). Agora usa
+  // operator_id_aliases (chave = ID do operador no Crisp, não o nome) via
+  // distinct_atendentes_canonico() no banco — resolve por identidade, não texto.
+  const { data, error } = await client().rpc("distinct_atendentes_canonico");
   if (error) throw error;
-
-  // O Crisp às vezes manda o apelido curto ("Vittor") e às vezes o nome
-  // completo ("Vittor Fernandes") pra mesma pessoa, dependendo da mensagem.
-  // Junta variações num nome canônico (o mais longo) em vez de listar cru.
-  const brutos = Array.from(new Set((data ?? []).map((r) => r.operator_nome).filter((n): n is string => Boolean(n))));
-  const ordenados = [...brutos].sort((a, b) => b.length - a.length);
-  const canonicos: string[] = [];
-  for (const nome of ordenados) {
-    const jaCoberto = canonicos.some((c) => c.toLowerCase().includes(nome.toLowerCase()));
-    if (!jaCoberto) canonicos.push(nome);
-  }
-  return canonicos.sort((a, b) => a.localeCompare(b)).map((nome) => ({ nome }));
+  return (data ?? []) as { nome: string }[];
 }
 
 export async function fetchDistinctTiposCliente(): Promise<{ label: string; tag: string }[]> {
