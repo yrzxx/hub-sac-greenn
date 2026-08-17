@@ -579,6 +579,41 @@ export async function fetchTfrTtrPercentis(
   return (data?.[0] ?? null) as TfrTtrPercentis | null;
 }
 
+export interface RelogioPosse {
+  atendente: string;
+  minutos_posse: number;
+  conversas: number;
+}
+
+// Só considera chamados já resolvidos no período — pra chamado ainda
+// pendente, "posse" cresceria indefinidamente enquanto ninguém retomar,
+// o que infla o agregado sem refletir trabalho de verdade (ver CLAUDE.md).
+export async function fetchRelogioPosse(inicio: Date, fim: Date, canal?: string): Promise<RelogioPosse[]> {
+  const { data, error } = await client().rpc("relogio_posse_periodo", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as RelogioPosse[];
+}
+
+export interface RelogioEsperaCliente {
+  amostras: number;
+  minutos_espera_medio: number | null;
+  minutos_espera_total: number | null;
+}
+
+export async function fetchRelogioEsperaCliente(inicio: Date, fim: Date, canal?: string): Promise<RelogioEsperaCliente | null> {
+  const { data, error } = await client().rpc("relogio_espera_cliente", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as RelogioEsperaCliente | null;
+}
+
 export interface BacklogFaixa {
   faixa: string;
   total: number;

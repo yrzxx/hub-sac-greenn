@@ -23,6 +23,8 @@ import {
   fetchDashboardAtendimentoSummary,
   fetchTfrTtrPercentis,
   fetchBacklogPorIdade,
+  fetchRelogioPosse,
+  fetchRelogioEsperaCliente,
 } from "@/services/api";
 import { resolvePeriodo, periodoAnterior, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
@@ -122,6 +124,16 @@ export default function Analytics() {
   const { data: backlog, isLoading: loadingBacklog } = useQuery({
     queryKey: ["backlog-por-idade", canal],
     queryFn: () => fetchBacklogPorIdade(canal || undefined),
+  });
+
+  const { data: posse, isLoading: loadingPosse } = useQuery({
+    queryKey: ["relogio-posse", inicio, fim, canal],
+    queryFn: () => fetchRelogioPosse(inicio, fim, canal || undefined),
+  });
+
+  const { data: esperaCliente, isLoading: loadingEspera } = useQuery({
+    queryKey: ["relogio-espera-cliente", inicio, fim, canal],
+    queryFn: () => fetchRelogioEsperaCliente(inicio, fim, canal || undefined),
   });
 
   const { data: ranking, isLoading: loadingRanking } = useQuery({
@@ -300,6 +312,77 @@ export default function Analytics() {
           Total em aberto: {backlog?.reduce((acc, b) => acc + b.total, 0) ?? 0} chamados. Evolução histórica do
           backlog ainda não é possível — não existe um snapshot diário salvo, só o estado atual.
         </p>
+      </div>
+
+      <div>
+        <h2 className="mb-3 font-display text-sm font-semibold text-ink">Relógios do atendimento</h2>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio do cliente</p>
+            <p className="mt-1 text-sm text-ink/60">Abertura até resolução final — é o TTR já mostrado em Velocidade, do ponto de vista de quem esperou.</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de espera do cliente</p>
+            {loadingEspera ? (
+              <p className="mt-2 text-sm text-ink/50">Carregando...</p>
+            ) : !esperaCliente || esperaCliente.amostras === 0 ? (
+              <p className="mt-2 text-sm text-ink/50">Sem amostras (só considera chamados resolvidos).</p>
+            ) : (
+              <>
+                <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration((esperaCliente.minutos_espera_medio ?? 0) * 60)}</p>
+                <p className="mt-1 text-[11px] text-ink/40">
+                  Média por espera · {esperaCliente.amostras} janelas em que o cliente falou e ficou aguardando ação da Greenn
+                </p>
+              </>
+            )}
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de trabalho ativo</p>
+            <p className="mt-1 text-sm text-ink/50">
+              Sem dado hoje — o Crisp não expõe estado de "ativo/ausente" do operador pela API. Não vou aproximar isso com posse (é outra coisa).
+            </p>
+          </Card>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de posse — por atendente (chamados resolvidos no período)</p>
+          {loadingPosse ? (
+            <p className="text-sm text-ink/50">Carregando...</p>
+          ) : !posse || posse.length === 0 ? (
+            <Card className="p-4"><p className="text-sm text-ink/50">Sem chamados resolvidos no período pra medir posse.</p></Card>
+          ) : (
+            <Card className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Atendente</th>
+                    <th className="px-4 py-3 font-medium">Tempo de posse (total)</th>
+                    <th className="px-4 py-3 font-medium">Chamados resolvidos</th>
+                    <th className="px-4 py-3 font-medium">Posse média por chamado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {posse.map((p) => (
+                    <tr key={p.atendente} className="border-t border-sand-line">
+                      <td className="px-4 py-3 font-medium text-ink">
+                        {p.atendente}
+                        {p.conversas < 5 && <span className="ml-1.5 text-[11px] font-normal text-ink/40">(amostra pequena)</span>}
+                      </td>
+                      <td className="px-4 py-3 text-ink/70">{formatDuration(p.minutos_posse * 60)}</td>
+                      <td className="px-4 py-3 text-ink/70">{p.conversas}</td>
+                      <td className="px-4 py-3 text-ink/70">{formatDuration((p.minutos_posse / p.conversas) * 60)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+          <p className="mt-2 text-xs text-ink/40">
+            Posse = tempo entre a 1ª mensagem de um atendente num chamado e a entrada do próximo atendente (ou a
+            resolução, se ninguém mais entrar) — cada trecho conta só pra quem estava "com a bola" naquele momento,
+            não o TTR inteiro pra todo mundo que passou pelo chamado.
+          </p>
+        </div>
       </div>
 
       <Card>
