@@ -220,7 +220,15 @@ geração automática de tipos configurada). Tabelas principais, por domínio:
 - `crisp_messages` — mensagem a mensagem (`origin`, `operator_crisp_id`);
   base real para calcular a primeira resposta **humana** (excluindo bot).
 - `atendente_aliases` — normaliza atendentes que são o mesmo (ex: "IA
-  Greenn" e "Mateus Lansa") para estatísticas/ranking.
+  Greenn" e "Mateus Lansa") para estatísticas/ranking, chaveado por
+  **e-mail** (usado no dashboard de CSAT).
+- `operator_id_aliases` — mesma ideia, mas chaveado pelo `operator_crisp_id`
+  (ID interno do operador no Crisp, não texto) — usado por
+  `atendimentos_com_metricas`/`atendente_performance`/`distinct_atendentes_
+  canonico()` pra reconciliar `crisp_conversations.operator_nome`. Existe
+  porque nome sozinho não é confiável pra identidade: "Ana" no Crisp é
+  **duas pessoas diferentes** (Ana Paula Maximiano de Souza e Ana Franca,
+  `operator_crisp_id` distintos) — ver seção 10, fix de 2026-08-17.
 - `crisp_ratings`, `nps_followups`, view `analytics_sac` — **schema
   paralelo, reservado, com 0 linhas** (ver decisão arquitetural na seção
   14). Não usar como fonte de dado hoje.
@@ -542,6 +550,32 @@ tinham se acumulado de assinaturas antigas ao longo da sessão (o Postgres
 identifica função por nome+tipos de parâmetro, então mudar a assinatura via
 `CREATE OR REPLACE` várias vezes cria uma nova sobrecarga a cada vez em vez
 de substituir, se os tipos mudarem).
+
+**Fix arquitetural em 2026-08-17 — reconciliação de atendente por nome
+trocada por ID (o "Comercial" duplicado de novo escancarou um problema
+maior):** a heurística de juntar variações de nome do Crisp (curto vs.
+completo) por `ILIKE`/substring — usada em `atendimentos_com_metricas`,
+`atendente_performance` e no dedup client-side de
+`fetchDistinctAtendentesConversas` — parecia funcionar, mas dependia de
+comparar strings sem nenhuma garantia de que duas pessoas não
+compartilhassem apelido curto. Investigando o caso "Comercial"/"Comercial
+Greenn" (que voltou a aparecer separado), cruzei `operator_nome` com
+`operator_crisp_id` (o ID real do operador no Crisp, disponível em
+`crisp_conversations` mas nunca usado pra isso) e achei um caso pior:
+**"Ana" não é uma pessoa, são duas** — Ana Paula Maximiano de Souza
+(`operator_crisp_id` `441dcca0-...`, 83 atendimentos) e Ana Franca
+(`4be15ad4-...`, 24 atendimentos) — a heurística por substring corria o
+risco real de somar os atendimentos/CSAT de uma na conta da outra.
+Substituído por `operator_id_aliases` (chave = `operator_crisp_id`) +
+`nome_canonico_por_operator_id()`, populada manualmente checando qual ID
+corresponde a qual nome completo (Brenda/Nathalia/Vittor/Comercial: um
+ID só, seguro de unificar; Ana: dois IDs, mantidos separados). Um nome
+curto — "Paula" (2 atendimentos) — não bateu com nenhum ID já visto com
+nome completo, então **ficou intencionalmente sem alias** em vez de
+adivinhar de quem é; se for a mesma Ana Paula ou outra pessoa, precisa
+de confirmação humana antes de unificar. `fetchDistinctAtendentesConversas`
+trocou o dedup no cliente por `distinct_atendentes_canonico()` no banco,
+mesma fonte de verdade.
 
 ## 11. Principais componentes reutilizáveis
 
