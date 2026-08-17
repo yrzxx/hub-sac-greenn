@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Download, ArrowUpDown, Star, FileDown } from "lucide-react";
+import { Search, Download, ArrowUpDown, Star, FileDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { cn, formatDelta } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -106,19 +107,25 @@ export default function Csat() {
   }
 
   const porColaborador = useMemo(() => {
-    const map = new Map<string, { atendente: string; notas: number[]; ultima: string }>();
+    const map = new Map<
+      string,
+      { atendente: string; notas: number[]; ultima: string; promotores: number; neutros: number; detratores: number }
+    >();
     (dashboardRows ?? []).forEach((r) => {
       const { chave, atendente } = normalizarChave(r.email_atendente, r.atendente);
       if (!chave) return;
-      const entry = map.get(chave) ?? { atendente, notas: [], ultima: r.data_hora };
+      const entry =
+        map.get(chave) ?? { atendente, notas: [], ultima: r.data_hora, promotores: 0, neutros: 0, detratores: 0 };
       if (r.nota !== null) entry.notas.push(r.nota);
+      if (r.classificacao_csat === "Promotor") entry.promotores++;
+      else if (r.classificacao_csat === "Neutro") entry.neutros++;
+      else if (r.classificacao_csat === "Detrator") entry.detratores++;
       if (new Date(r.data_hora) > new Date(entry.ultima)) entry.ultima = r.data_hora;
       map.set(chave, entry);
     });
     return Array.from(map.entries()).map(([chave, v]) => {
       const media = v.notas.length ? v.notas.reduce((a, b) => a + b, 0) / v.notas.length : null;
-      const satisfeitos = v.notas.filter((n) => n >= 4).length;
-      const percentual = v.notas.length ? (satisfeitos / v.notas.length) * 100 : null;
+      const percentual = media !== null ? (media / 5) * 100 : null;
 
       const notasAnteriores = (dashboardAnterior ?? [])
         .filter((r) => normalizarChave(r.email_atendente, r.atendente).chave === chave && r.nota !== null)
@@ -129,9 +136,55 @@ export default function Csat() {
       const evolucao =
         media !== null && mediaAnterior ? ((media - mediaAnterior) / mediaAnterior) * 100 : undefined;
 
-      return { uid: chave, atendente: v.atendente, media, total: v.notas.length, percentual, ultima: v.ultima, evolucao };
+      return {
+        uid: chave,
+        atendente: v.atendente,
+        media,
+        total: v.notas.length,
+        percentual,
+        ultima: v.ultima,
+        evolucao,
+        promotores: v.promotores,
+        neutros: v.neutros,
+        detratores: v.detratores,
+      };
     });
   }, [dashboardRows, dashboardAnterior, aliasMap]);
+
+  function rotuloCsat(pct: number | null) {
+    if (pct === null) return "—";
+    if (pct >= 90) return "Ótimo";
+    if (pct >= 75) return "Bom";
+    if (pct >= 50) return "Regular";
+    return "Ruim";
+  }
+
+  function deltaRelativo(atual: number, anterior: number) {
+    if (!anterior) return undefined;
+    return ((atual - anterior) / anterior) * 100;
+  }
+
+  const resumoAtual = useMemo(() => {
+    const rows = dashboardRows ?? [];
+    const total = rows.length;
+    const notas = rows.map((r) => r.nota).filter((n): n is number => n !== null);
+    const csatPercent = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length / 5) * 100 : null;
+    const promotores = rows.filter((r) => r.classificacao_csat === "Promotor").length;
+    const neutros = rows.filter((r) => r.classificacao_csat === "Neutro").length;
+    const detratores = rows.filter((r) => r.classificacao_csat === "Detrator").length;
+    return { total, csatPercent, promotores, neutros, detratores };
+  }, [dashboardRows]);
+
+  const resumoAnterior = useMemo(() => {
+    const rows = dashboardAnterior ?? [];
+    const total = rows.length;
+    const notas = rows.map((r) => r.nota).filter((n): n is number => n !== null);
+    const csatPercent = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length / 5) * 100 : null;
+    const promotores = rows.filter((r) => r.classificacao_csat === "Promotor").length;
+    const neutros = rows.filter((r) => r.classificacao_csat === "Neutro").length;
+    const detratores = rows.filter((r) => r.classificacao_csat === "Detrator").length;
+    return { total, csatPercent, promotores, neutros, detratores };
+  }, [dashboardAnterior]);
 
   const totalPages = planilha ? Math.ceil(planilha.count / PAGE_SIZE) : 0;
 
@@ -144,19 +197,47 @@ export default function Csat() {
             Planilha completa e dashboard por colaborador, com filtros e exportação.
           </p>
         </div>
-        <SegmentedControl
-          options={[["planilha", "Planilha"], ["dashboard", "Dashboard"]] as const}
-          value={aba}
-          onChange={setAba}
-        />
+        <div className="flex items-center gap-3">
+          <DateRangePopover
+            preset={preset}
+            personalizado={personalizado}
+            onChangePreset={setPreset}
+            onChangePersonalizado={setPersonalizado}
+          />
+          <SegmentedControl
+            options={[["planilha", "Planilha"], ["dashboard", "Dashboard"]] as const}
+            value={aba}
+            onChange={setAba}
+          />
+        </div>
       </div>
 
-      <DateRangePopover
-        preset={preset}
-        personalizado={personalizado}
-        onChangePreset={setPreset}
-        onChangePersonalizado={setPersonalizado}
-      />
+      {aba === "dashboard" && !loadingDashboard && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <Kpi label="Total de Avaliações" value={String(resumoAtual.total)} delta={deltaRelativo(resumoAtual.total, resumoAnterior.total)} />
+          <Kpi
+            label="CSAT"
+            value={resumoAtual.csatPercent !== null ? `${resumoAtual.csatPercent.toFixed(1)}%` : "—"}
+            delta={deltaRelativo(resumoAtual.csatPercent ?? 0, resumoAnterior.csatPercent ?? 0)}
+          />
+          <Kpi
+            label="Promotores"
+            value={`${resumoAtual.promotores} / ${resumoAtual.total ? ((resumoAtual.promotores / resumoAtual.total) * 100).toFixed(0) : 0}%`}
+            delta={deltaRelativo(resumoAtual.promotores, resumoAnterior.promotores)}
+          />
+          <Kpi
+            label="Neutros"
+            value={`${resumoAtual.neutros} / ${resumoAtual.total ? ((resumoAtual.neutros / resumoAtual.total) * 100).toFixed(0) : 0}%`}
+            delta={deltaRelativo(resumoAtual.neutros, resumoAnterior.neutros)}
+          />
+          <Kpi
+            label="Detratores"
+            value={`${resumoAtual.detratores} / ${resumoAtual.total ? ((resumoAtual.detratores / resumoAtual.total) * 100).toFixed(0) : 0}%`}
+            delta={deltaRelativo(resumoAtual.detratores, resumoAnterior.detratores)}
+            invertDeltaColor
+          />
+        </div>
+      )}
 
       <Card className="flex flex-wrap items-center gap-2 p-3">
         <div className="relative">
@@ -314,7 +395,7 @@ export default function Csat() {
           {porColaborador.map((c) => (
             <Card key={c.uid} className="p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-forest-50 text-sm font-display font-semibold text-forest-700">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-forest-50 text-sm font-display font-semibold text-forest-700">
                   {c.atendente?.split(" ").slice(0, 2).map((n) => n[0]).join("")}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -322,8 +403,47 @@ export default function Csat() {
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Kpi label="Nota média" value={c.media?.toFixed(1) ?? "—"} delta={c.evolucao} />
-                <Kpi label="Satisfação" value={c.percentual !== null ? `${c.percentual.toFixed(0)}%` : "—"} />
+                <div className="rounded-xl border border-sand-line bg-sand-bg/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-ink/40">CSAT</p>
+                  <p className="mt-1 flex items-baseline gap-1">
+                    <span className="font-display text-lg font-semibold text-ink tabular-nums">
+                      {c.percentual !== null ? `${c.percentual.toFixed(1)}%` : "—"}
+                    </span>
+                    <span className="text-[11px] text-ink/40">/ {rotuloCsat(c.percentual)}</span>
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-1 flex items-center gap-0.5 text-[11px] font-medium",
+                      c.evolucao === undefined ? "invisible" : c.evolucao >= 0 ? "text-forest-600" : "text-rust-500"
+                    )}
+                  >
+                    {c.evolucao !== undefined && (c.evolucao >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
+                    {formatDelta(c.evolucao) ?? "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-sand-line bg-sand-bg/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-ink/40">Níveis</p>
+                  <dl className="mt-1.5 space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-ink/50">Promotores</dt>
+                      <dd className="font-semibold text-forest-600">
+                        {c.promotores} / {c.total ? ((c.promotores / c.total) * 100).toFixed(0) : 0}%
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-ink/50">Neutros</dt>
+                      <dd className="font-semibold text-amber-600">
+                        {c.neutros} / {c.total ? ((c.neutros / c.total) * 100).toFixed(0) : 0}%
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-ink/50">Detratores</dt>
+                      <dd className="font-semibold text-rust-600">
+                        {c.detratores} / {c.total ? ((c.detratores / c.total) * 100).toFixed(0) : 0}%
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
               <CardContent className="mt-2 px-0 pb-0 text-xs text-ink/50">
                 <strong className="text-ink">{c.total}</strong> avaliações · Última em {new Date(c.ultima).toLocaleDateString("pt-BR")}
