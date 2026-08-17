@@ -25,13 +25,13 @@ export function BarChart({ data, getColorClass = corPorFaixa, height = 160, clas
   if (data.length === 0) return null;
   const max = Math.max(...data.map((d) => Math.abs(d.value)), 1);
   return (
-    <div className={cn("flex items-end gap-2 overflow-x-auto", className)} style={{ height }}>
+    <div className={cn("flex gap-2 overflow-x-auto", className)} style={{ height }}>
       {data.map((d, i) => (
         <div key={`${d.label}-${i}`} className="flex min-w-[36px] flex-1 flex-col items-center gap-1.5">
           <span className="text-[11px] font-semibold text-ink/70 tabular-nums">
             {d.displayValue ?? d.value}
           </span>
-          <div className="flex h-full w-full flex-col justify-end">
+          <div className="flex w-full flex-1 flex-col justify-end">
             <div
               className={cn("w-full rounded-t-md transition-[height] duration-300", getColorClass(d.value))}
               style={{ height: `${Math.max((Math.abs(d.value) / max) * 100, 4)}%` }}
