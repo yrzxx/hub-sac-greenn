@@ -385,6 +385,19 @@ export default function Analytics() {
         </div>
       </div>
 
+      <div>
+        <h2 className="mb-3 font-display text-sm font-semibold text-ink">Qualidade (QA)</h2>
+        <Card className="flex items-start gap-3 p-4">
+          <Star size={16} className="mt-0.5 text-ink/40" />
+          <p className="text-sm text-ink/50">
+            Sem dado ainda — não existe hoje nenhuma avaliação de qualidade de atendimento registrada (manual ou
+            automática). A estrutura de critérios com pesos (solução 30% / processo 20% / comunicação 15% /
+            segurança 15% / registro 10% / empatia 10%) precisa de uma tabela nova e de um processo de avaliação
+            definido antes de ter número real pra mostrar aqui — não vou estimar isso.
+          </p>
+        </Card>
+      </div>
+
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 p-5 pb-0">
           <h2 className="font-display text-sm font-semibold text-ink">Evolução de chamados e CSAT</h2>
