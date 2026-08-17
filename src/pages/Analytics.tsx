@@ -21,9 +21,12 @@ import {
   fetchDistribuicaoTopico,
   fetchDistinctCanais,
   fetchDashboardAtendimentoSummary,
+  fetchTfrTtrPercentis,
+  fetchBacklogPorIdade,
 } from "@/services/api";
 import { resolvePeriodo, periodoAnterior, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
+import { cn } from "@/lib/utils";
 import { DateRangePopover } from "@/components/ui/DateRangePopover";
 
 const statusLabel: Record<string, string> = { resolved: "Resolvido", unresolved: "Pendente" };
@@ -109,6 +112,16 @@ export default function Analytics() {
   const { data: evolucaoCsat, isLoading: loadingEvolucao } = useQuery({
     queryKey: ["analytics-evolucao", filtrosAnalytics, granularidade],
     queryFn: () => fetchAnalyticsEvolucao({ ...filtrosAnalytics, granularidade }),
+  });
+
+  const { data: percentis, isLoading: loadingPercentis } = useQuery({
+    queryKey: ["tfr-ttr-percentis", inicio, fim, canal],
+    queryFn: () => fetchTfrTtrPercentis(inicio, fim, canal || undefined),
+  });
+
+  const { data: backlog, isLoading: loadingBacklog } = useQuery({
+    queryKey: ["backlog-por-idade", canal],
+    queryFn: () => fetchBacklogPorIdade(canal || undefined),
   });
 
   const { data: ranking, isLoading: loadingRanking } = useQuery({
@@ -201,13 +214,91 @@ export default function Analytics() {
           <Kpi label="Total de chamados" value={loadingTotalChamados ? "..." : String(totalChamados?.total_conversas ?? 0)} icon={PhoneCall} />
           <Kpi label="Total de avaliações" value={loadingSummary ? "..." : String(summary?.total_avaliacoes ?? 0)} delta={totalDelta} icon={MessagesSquare} />
           <Kpi label="CSAT (nota média)" value={loadingSummary ? "..." : summary?.media_csat?.toFixed(1) ?? "—"} icon={Star} />
-          <Kpi label="Satisfação" value={loadingSummary ? "..." : summary?.percentual_satisfacao !== null && summary?.percentual_satisfacao !== undefined ? `${summary.percentual_satisfacao}%` : "—"} icon={CheckCircle2} />
+          <Kpi label="CSAT positivo" value={loadingSummary ? "..." : summary?.percentual_satisfacao !== null && summary?.percentual_satisfacao !== undefined ? `${summary.percentual_satisfacao}%` : "—"} icon={CheckCircle2} />
           <Kpi label="Tempo médio 1ª resposta" value={formatDuration(summary?.tempo_1resposta_medio ?? null)} icon={Timer} />
           <Kpi label="Tempo médio de encerramento" value={formatDuration(summary?.tempo_encerramento_medio ?? null)} icon={Timer} />
         </div>
         <p className="mt-2 text-xs text-ink/40">
           "Total de chamados" conta todas as conversas do período (avaliadas ou não); "Total de avaliações" conta
           só as que receberam uma nota de CSAT — por isso os dois números normalmente são diferentes.
+        </p>
+      </div>
+
+      <div>
+        <h2 className="mb-3 font-display text-sm font-semibold text-ink">Velocidade</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/40">TFR — tempo até 1ª resposta humana</p>
+            {loadingPercentis ? (
+              <p className="mt-2 text-sm text-ink/50">Carregando...</p>
+            ) : !percentis || percentis.tfr_amostras === 0 ? (
+              <p className="mt-2 text-sm text-ink/50">Sem amostras no período.</p>
+            ) : (
+              <>
+                <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration(percentis.tfr_media)}</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
+                  <span>P50: {formatDuration(percentis.tfr_p50)}</span>
+                  <span>P90: {formatDuration(percentis.tfr_p90)}</span>
+                  <span>P95: {formatDuration(percentis.tfr_p95)}</span>
+                </div>
+                <p className={cn("mt-2 text-sm font-medium", (percentis.tfr_sla_pct ?? 0) >= 80 ? "text-forest-600" : "text-rust-500")}>
+                  SLA cumprido: {percentis.tfr_sla_pct?.toFixed(1) ?? "—"}%
+                </p>
+                <p className="mt-1 text-[11px] text-ink/40">{percentis.tfr_amostras} amostras</p>
+              </>
+            )}
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink/40">TTR — tempo até resolução</p>
+            {loadingPercentis ? (
+              <p className="mt-2 text-sm text-ink/50">Carregando...</p>
+            ) : !percentis || percentis.ttr_amostras === 0 ? (
+              <p className="mt-2 text-sm text-ink/50">Sem amostras no período.</p>
+            ) : (
+              <>
+                <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration(percentis.ttr_media)}</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
+                  <span>P50: {formatDuration(percentis.ttr_p50)}</span>
+                  <span>P90: {formatDuration(percentis.ttr_p90)}</span>
+                  <span>P95: {formatDuration(percentis.ttr_p95)}</span>
+                </div>
+                <p className={cn("mt-2 text-sm font-medium", (percentis.ttr_sla_pct ?? 0) >= 80 ? "text-forest-600" : "text-rust-500")}>
+                  SLA cumprido: {percentis.ttr_sla_pct?.toFixed(1) ?? "—"}%
+                </p>
+                <p className="mt-1 text-[11px] text-ink/40">{percentis.ttr_amostras} amostras</p>
+              </>
+            )}
+          </Card>
+        </div>
+        <p className="mt-2 text-xs text-ink/40">
+          SLA de 1ª resposta e de resolução são independentes (metas em minutos configuráveis em <code>sla_config</code>,
+          hoje uma regra única global). Tempo já desconta fora de expediente.
+        </p>
+      </div>
+
+      <div>
+        <h2 className="mb-3 font-display text-sm font-semibold text-ink">Operação — Backlog</h2>
+        {loadingBacklog ? (
+          <p className="text-sm text-ink/50">Carregando...</p>
+        ) : !backlog || backlog.length === 0 ? (
+          <Card className="p-4"><p className="text-sm text-ink/50">Nenhum chamado em aberto.</p></Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {(["0-1 dia", "2-3 dias", "4-7 dias", "+7 dias"] as const).map((faixa) => {
+              const total = backlog.find((b) => b.faixa === faixa)?.total ?? 0;
+              const critico = faixa === "+7 dias";
+              return (
+                <Card key={faixa} className={cn("p-4", critico && total > 0 && "border-rust-400/40 bg-rust-500/5")}>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink/40">{faixa}</p>
+                  <p className={cn("mt-1 font-display text-kpi-lg font-semibold", critico && total > 0 ? "text-rust-600" : "text-ink")}>{total}</p>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-ink/40">
+          Total em aberto: {backlog?.reduce((acc, b) => acc + b.total, 0) ?? 0} chamados. Evolução histórica do
+          backlog ainda não é possível — não existe um snapshot diário salvo, só o estado atual.
         </p>
       </div>
 

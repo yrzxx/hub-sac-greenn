@@ -548,6 +548,74 @@ export async function fetchAnalyticsSummary(f: AnalyticsFilters): Promise<Analyt
   return (data?.[0] ?? null) as AnalyticsSummary | null;
 }
 
+export interface TfrTtrPercentis {
+  tfr_amostras: number;
+  tfr_media: number | null;
+  tfr_p50: number | null;
+  tfr_p90: number | null;
+  tfr_p95: number | null;
+  tfr_sla_pct: number | null;
+  ttr_amostras: number;
+  ttr_media: number | null;
+  ttr_p50: number | null;
+  ttr_p90: number | null;
+  ttr_p95: number | null;
+  ttr_sla_pct: number | null;
+}
+
+export async function fetchTfrTtrPercentis(
+  inicio: Date,
+  fim: Date,
+  canal?: string,
+  atendenteNome?: string
+): Promise<TfrTtrPercentis | null> {
+  const { data, error } = await client().rpc("tfr_ttr_percentis", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+    p_atendente_nome: atendenteNome ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as TfrTtrPercentis | null;
+}
+
+export interface BacklogFaixa {
+  faixa: string;
+  total: number;
+}
+
+export async function fetchBacklogPorIdade(canal?: string, atendenteNome?: string): Promise<BacklogFaixa[]> {
+  const { data, error } = await client().rpc("backlog_por_idade", {
+    p_canal: canal ?? null,
+    p_atendente_nome: atendenteNome ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as BacklogFaixa[];
+}
+
+export interface SlaConfig {
+  id: string;
+  meta_primeira_resposta_min: number;
+  meta_resolucao_min: number;
+}
+
+export async function fetchSlaConfigPadrao(): Promise<SlaConfig | null> {
+  const { data, error } = await client()
+    .from("sla_config")
+    .select("id, meta_primeira_resposta_min, meta_resolucao_min")
+    .is("canal", null)
+    .is("prioridade", null)
+    .is("motivo", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertSlaConfigPadrao(id: string, meta: { meta_primeira_resposta_min: number; meta_resolucao_min: number }) {
+  const { error } = await client().from("sla_config").update(meta).eq("id", id);
+  if (error) throw error;
+}
+
 export async function fetchAnalyticsEvolucao(
   f: AnalyticsFilters & { granularidade: "day" | "week" | "month" }
 ): Promise<{ periodo: string; media_csat: number; total: number }[]> {
