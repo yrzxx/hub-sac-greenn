@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { fetchUsers, fetchRoles, upsertUser, deleteUser } from "@/services/api";
+import { fetchUsers, fetchRoles, upsertUser, deleteUser, inviteUser } from "@/services/api";
 import type { DbUser } from "@/types/database";
 
 const userSchema = z.object({
@@ -86,7 +86,11 @@ export default function AdminUsuarios() {
     setSalvando(true);
     setErro(null);
     try {
-      await upsertUser({ ...(editando ? { id: editando.id } : {}), ...data });
+      if (editando) {
+        await upsertUser({ id: editando.id, ...data });
+      } else {
+        await inviteUser(data);
+      }
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       setDialogAberto(false);
     } catch (err) {
@@ -211,7 +215,7 @@ export default function AdminUsuarios() {
             <p className="mt-1 text-xs text-ink/50">
               {editando
                 ? "Isso atualiza o registro em public.users."
-                : "Isso cria um registro em public.users. Para o usuário conseguir logar, crie também o acesso de autenticação (Supabase Auth) e vincule o auth_id."}
+                : "A pessoa recebe um e-mail de convite automático pra definir a própria senha — o acesso já é criado e vinculado sozinho."}
             </p>
             <form onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3">
               <div>
