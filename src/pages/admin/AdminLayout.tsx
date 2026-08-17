@@ -7,6 +7,7 @@ const tabs = [
   { to: "/admin/perfis", label: "Perfis" },
   { to: "/admin/permissoes", label: "Permissões" },
   { to: "/admin/escalas", label: "Escalas" },
+  { to: "/admin/aliases", label: "Aliases de Atendente" },
   { to: "/admin/modulos", label: "Módulos" },
   { to: "/admin/cursos", label: "Cursos" },
   { to: "/admin/documentacao", label: "Documentação" },
