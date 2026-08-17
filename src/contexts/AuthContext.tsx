@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchCurrentProfile } from "@/services/api";
+import { fetchCurrentProfile, ensureOnlineStatus } from "@/services/api";
 import type { AppUser, UserRole } from "@/types";
 import type { DbUser } from "@/types/database";
 
@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(mapDbUserToAppUser(profile));
       setError(null);
+      ensureOnlineStatus(profile.id).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar perfil.");
       setUser(null);

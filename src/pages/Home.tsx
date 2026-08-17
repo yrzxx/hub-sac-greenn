@@ -67,7 +67,15 @@ const prioridadeTone = {
 } as const;
 
 function getSaudacao() {
-  const hora = new Date().getHours();
+  // Horário de Rondon-PR (Paraná) — mesmo fuso de São Paulo (UTC-3), calculado
+  // explicitamente em vez de confiar no fuso configurado no dispositivo.
+  const hora = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hourCycle: "h23",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date())
+  );
   if (hora < 12) return "Bom dia";
   if (hora < 18) return "Boa tarde";
   return "Boa noite";
