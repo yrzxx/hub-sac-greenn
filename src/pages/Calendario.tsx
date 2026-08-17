@@ -28,6 +28,24 @@ const leaveSchema = z.object({
 });
 type LeaveForm = z.infer<typeof leaveSchema>;
 
+function emojiFeriado(nome: string): string {
+  const n = nome.toLowerCase();
+  if (n.includes("natal")) return "🎅";
+  if (n.includes("páscoa") || n.includes("pascoa")) return "🥚";
+  if (n.includes("sexta-feira santa") || n.includes("sexta feira santa")) return "✝️";
+  if (n.includes("carnaval")) return "🎭";
+  if (n.includes("confraterniza")) return "🎉";
+  if (n.includes("trabalho")) return "🛠️";
+  if (n.includes("independ")) return "🎆";
+  if (n.includes("aparecida")) return "🙏";
+  if (n.includes("finados")) return "🕯️";
+  if (n.includes("república") || n.includes("republica")) return "🏛️";
+  if (n.includes("consciência negra") || n.includes("consciencia negra")) return "✊🏿";
+  if (n.includes("corpus christi")) return "⛪";
+  if (n.includes("tiradentes")) return "⚔️";
+  return "🇧🇷";
+}
+
 const oncallSchema = z.object({
   user_id: z.string().min(1, "Selecione um colaborador"),
   horario_inicio: z.string().min(1),
@@ -240,16 +258,17 @@ export default function Calendario() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="p-4">
           <p className="text-xs text-ink/50">Próximo feriado</p>
-          <p className="mt-1 font-display text-sm font-semibold text-ink">
-            {proximoFeriado ? `${proximoFeriado.nome}` : "—"}
+          <p className="mt-1 flex items-center gap-1.5 font-display text-sm font-semibold text-ink">
+            {proximoFeriado && <span>{emojiFeriado(proximoFeriado.nome)}</span>}
+            {proximoFeriado ? proximoFeriado.nome : "—"}
           </p>
           {proximoFeriado && (
             <p className="text-xs text-ink/40">{new Date(proximoFeriado.data + "T00:00:00").toLocaleDateString("pt-BR")}</p>
           )}
         </Card>
-        <Card className="p-4">
+        <Card className={responsavelSemanaAtual ? "p-4" : "border-rust-400/40 bg-rust-500/5 p-4"}>
           <p className="text-xs text-ink/50">Responsável da semana</p>
-          <p className="mt-1 font-display text-sm font-semibold text-ink">
+          <p className={"mt-1 font-display text-sm font-semibold " + (responsavelSemanaAtual ? "text-ink" : "text-rust-600")}>
             {responsavelSemanaAtual?.usuario?.nome ?? "Não definido"}
           </p>
         </Card>
@@ -262,6 +281,19 @@ export default function Calendario() {
           <p className="mt-1 font-display text-sm font-semibold text-ink">{feriasNoMes}</p>
         </Card>
       </div>
+
+      {isAdmin && !responsavelSemanaAtual && (
+        <Card className="border-rust-400/40 bg-rust-500/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 font-display text-sm font-semibold text-ink">
+              <AlertCircle size={16} className="text-rust-500" /> Nenhum responsável definido para a semana atual
+            </h2>
+            <Button size="sm" variant="secondary" onClick={() => setDiaSelecionado(hoje)}>
+              Definir agora
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {isAdmin && pendentes && pendentes.length > 0 && (
         <Card className="border-amber-400/40 bg-amber-500/5 p-4">
@@ -300,20 +332,27 @@ export default function Calendario() {
                 const info = infoDia(dia);
                 const foraDoMes = dia.getMonth() !== mesRef.getMonth();
                 const isHoje = toISODate(dia) === toISODate(hoje);
+                const corEspecial = info.holiday
+                  ? "bg-amber-50 hover:bg-amber-100/70"
+                  : info.isDomingo
+                    ? "bg-rust-50 hover:bg-rust-100/60"
+                    : info.isSabado
+                      ? "bg-sky-50 hover:bg-sky-100/60"
+                      : "hover:bg-sand-bg/60";
                 return (
                   <button
                     key={info.iso}
                     onClick={() => setDiaSelecionado(dia)}
                     className={
-                      "flex min-h-[90px] flex-col items-start gap-1 border-r border-sand-line p-2 text-left last:border-r-0 hover:bg-sand-bg/60 " +
-                      (foraDoMes ? "bg-sand-bg/30 text-ink/30" : "text-ink")
+                      "flex min-h-[90px] flex-col items-start gap-1 border-r border-sand-line p-2 text-left last:border-r-0 " +
+                      (foraDoMes ? "bg-sand-bg/30 text-ink/30 hover:bg-sand-bg/50" : "text-ink " + corEspecial)
                     }
                   >
                     <span className={"flex h-6 w-6 items-center justify-center rounded-full text-xs " + (isHoje ? "bg-forest-500 text-white" : "")}>
                       {dia.getDate()}
                     </span>
                     <div className="flex flex-wrap gap-1">
-                      {info.holiday && <span title={info.holiday.nome} className="text-[10px]">🇧🇷</span>}
+                      {info.holiday && <span title={info.holiday.nome} className="text-xs">{emojiFeriado(info.holiday.nome)}</span>}
                       {(info.responsavelSemana?.user_id || info.oncallSabado?.user_id) && <span title="Responsável" className="text-[10px]">🟢</span>}
                       {info.folgasDoDia.length > 0 && <span title="Folga" className="text-[10px]">🟡</span>}
                       {info.feriasDoDia.length > 0 && <span title="Férias" className="text-[10px]">🔴</span>}

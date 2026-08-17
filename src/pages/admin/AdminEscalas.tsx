@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, GripVertical, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -10,6 +10,8 @@ import {
   removeEscalaSabadoItem,
   fetchUsers,
   fetchAtendenteEscaladoSabado,
+  fetchEscalaSabadoConfig,
+  upsertEscalaSabadoConfig,
 } from "@/services/api";
 
 function proximosSabados(qtd: number) {
@@ -31,14 +33,31 @@ export default function AdminEscalas() {
 
   const { data: escala, isLoading } = useQuery({ queryKey: ["escala-sabado"], queryFn: fetchEscalaSabado });
   const { data: usuarios } = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
+  const { data: dataReferencia } = useQuery({ queryKey: ["escala-sabado-config"], queryFn: fetchEscalaSabadoConfig });
+  const [novaDataReferencia, setNovaDataReferencia] = useState("");
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
 
-  const sabados = proximosSabados(4);
+  async function salvarDataReferencia() {
+    if (!novaDataReferencia) return;
+    setSalvandoConfig(true);
+    setErro(null);
+    try {
+      await upsertEscalaSabadoConfig(novaDataReferencia);
+      await queryClient.invalidateQueries({ queryKey: ["escala-sabado-config"] });
+      await queryClient.invalidateQueries({ queryKey: ["escalados-sabados"] });
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível salvar a data de referência.");
+    } finally {
+      setSalvandoConfig(false);
+    }
+  }
+
+  const sabados = useMemo(() => proximosSabados(4), []);
+  const isoSabados = useMemo(() => sabados.map((s) => s.toISOString().slice(0, 10)), [sabados]);
   const { data: escaladosPorSabado } = useQuery({
-    queryKey: ["escalados-sabados", sabados.map((s) => s.toISOString())],
+    queryKey: ["escalados-sabados", isoSabados],
     queryFn: async () => {
-      const resultados = await Promise.all(
-        sabados.map((s) => fetchAtendenteEscaladoSabado(s.toISOString().slice(0, 10)))
-      );
+      const resultados = await Promise.all(isoSabados.map((iso) => fetchAtendenteEscaladoSabado(iso)));
       return sabados.map((s, i) => ({ data: s, atendente: resultados[i] }));
     },
     enabled: (escala?.length ?? 0) > 0,
@@ -78,6 +97,29 @@ export default function AdminEscalas() {
           automaticamente a partir da posição de cada um na lista.
         </p>
       </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div>
+          <p className="text-sm font-medium text-ink">Data de referência do rodízio</p>
+          <p className="text-xs text-ink/50">
+            Sábado a partir do qual a posição #1 da sequência começa a contar.
+            {dataReferencia && (
+              <> Hoje: <strong>{new Date(dataReferencia + "T00:00:00").toLocaleDateString("pt-BR")}</strong>.</>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            defaultValue={dataReferencia ?? ""}
+            onChange={(e) => setNovaDataReferencia(e.target.value)}
+            className="h-9 rounded-lg border border-sand-line px-2 text-sm"
+          />
+          <Button size="sm" onClick={salvarDataReferencia} disabled={salvandoConfig || !novaDataReferencia}>
+            {salvandoConfig ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </Card>
 
       {erro && <p className="text-sm text-rust-500">{erro}</p>}
 
