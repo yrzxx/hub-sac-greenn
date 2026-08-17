@@ -77,16 +77,18 @@ precisar de `--legacy-peer-deps` permanentemente.
 ## Prioridade Alta
 
 ### 1. Vínculo `email_atendente`/`operator_email` sem normalização
-**[Documentado no README, agravado por achado de código]**
+**[Superado em 2026-08-13/14]**
 
-O vínculo real entre `csat_results`/`crisp_conversations` e `users` é por
-e-mail em texto livre, não por chave estrangeira — já causou dados
-"silenciosamente vazios" no passado. Não há indício de normalização
-(`lower(trim(email))`) nas funções SQL que fazem esse cruzamento.
-
-**Ação sugerida**: confirmar no banco (fora do escopo deste frontend) se
-existe normalização; um e-mail com capitalização diferente entre o Crisp e
-`users.email` quebra o vínculo silenciosamente.
+`crisp_conversations.operator_email` provou estar sempre `NULL` na prática
+— o vínculo real virou correspondência fuzzy por **nome** (`operator_nome`,
+via `ILIKE`), não mais por e-mail, nas funções que leem essa tabela
+(`atendimentos_com_metricas`, `atendente_performance`,
+`minhas_conversas_metricas`). `csat_results.email_atendente` continua
+sendo e-mail de verdade e é a chave usada por `atendente_aliases`. A
+preocupação original (normalização de e-mail) não se aplica mais do jeito
+que foi escrita; o risco equivalente hoje é de nomes duplicados/variantes
+no Crisp, mitigado pela reconciliação por nome já embutida nas funções SQL
+e pela tela de aliases (Administração → Aliases de Atendente).
 
 ### 2. `csat_results.tempo_*` continua 100% nulo
 **[Documentado no README]**
@@ -126,7 +128,11 @@ integração externa (HugMe/Crisp via n8n).
 necessária.
 
 ### 7. Horário de expediente sem diferenciar fins de semana/feriados
-**[Documentado no README]** — idem.
+**[Resolvido em 2026-08-13]** — `minutos_uteis_entre()` agora calcula tempo
+só em horário útil (jornada por usuário, Seg–Sex + plantão fixo de sábado
+08–12h, domingo fora), usado em `atendimentos_com_metricas`,
+`atendente_performance`, `dashboard_atendimento_summary` e
+`minhas_conversas_metricas`. Ver CLAUDE.md seção 10.
 
 ### 8. Roadmap de escopo original fora desta fase
 **[Documentado no README]** — Reunião de Resultados avançada (comparação
