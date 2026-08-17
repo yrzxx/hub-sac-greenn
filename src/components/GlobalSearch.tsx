@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Search, Home, LayoutDashboard, Target, BarChart3, ClipboardList,
   GraduationCap, BookOpen, Megaphone, Wrench, CalendarDays, Link2,
-  Star, MessageSquareWarning, Gauge, Settings, PhoneCall, TrendingUp, User,
+  Star, MessageSquareWarning, Gauge, Settings, AlertOctagon, TrendingUp, User,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -31,8 +31,8 @@ const ITEMS: Item[] = [
   { label: "CSAT", to: "/csat", icon: Star, perm: "csat" },
   { label: "Reclame Aqui", to: "/reclame-aqui", icon: MessageSquareWarning, perm: "reclame_aqui" },
   { label: "NPS", to: "/nps", icon: Gauge, perm: "nps" },
-  { label: "Atendimentos", to: "/atendimentos", icon: PhoneCall, adminOnly: true },
   { label: "Performance", to: "/performance", icon: TrendingUp, adminOnly: true },
+  { label: "Em Risco", to: "/em-risco", icon: AlertOctagon, adminOnly: true },
   { label: "Administração", to: "/admin", icon: Settings, adminOnly: true },
   { label: "Perfil", to: "/perfil", icon: User },
 ];

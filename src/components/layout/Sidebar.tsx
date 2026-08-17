@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Home,
   LayoutDashboard,
-  PhoneCall,
+  AlertOctagon,
   TrendingUp,
   Target,
   BarChart3,
@@ -120,7 +120,7 @@ export function Sidebar() {
         </span>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-thin px-2 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-dark px-2 py-2">
         <SectionLabel collapsed={collapsed}>Área SAC</SectionLabel>
         {sacItems.map((item) => (
           <NavItem key={item.to} {...item} collapsed={collapsed} />
@@ -133,7 +133,7 @@ export function Sidebar() {
               <NavItem to="/csat" label="CSAT" icon={Star} collapsed={collapsed} />
             )}
             {hasPermission("reclame_aqui") && (
-              <NavItem to="/reclame-aqui" label="Riscos" icon={MessageSquareWarning} collapsed={collapsed} />
+              <NavItem to="/reclame-aqui" label="Reclame" icon={MessageSquareWarning} collapsed={collapsed} />
             )}
             {hasPermission("nps") && (
               <NavItem to="/nps" label="NPS" icon={Gauge} collapsed={collapsed} />
@@ -144,8 +144,8 @@ export function Sidebar() {
         {isAdmin && (
           <>
             <SectionLabel collapsed={collapsed}>Área de Administradores</SectionLabel>
-            <NavItem to="/atendimentos" label="Atendimentos" icon={PhoneCall} collapsed={collapsed} />
             <NavItem to="/performance" label="Performance" icon={TrendingUp} collapsed={collapsed} />
+            <NavItem to="/em-risco" label="Em Risco" icon={AlertOctagon} collapsed={collapsed} />
             <NavItem to="/admin" label="Configurações da plataforma" icon={Settings} collapsed={collapsed} highlight />
           </>
         )}
