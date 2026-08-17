@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import {
   fetchMissionProgress,
   fetchAllMissions,
@@ -18,6 +19,7 @@ import {
   upsertMission,
   deleteMission,
   claimMission,
+  updateMyMissionProgress,
 } from "@/services/api";
 import type { DbMission } from "@/types/database";
 
@@ -158,6 +160,31 @@ export default function Missoes() {
     [todasMissoes]
   );
 
+  const moedasGanhas = useMemo(
+    () =>
+      minhasMissoes
+        .filter((p) => p.atual >= (p.missions?.meta ?? 1))
+        .reduce((acc, p) => acc + (p.missions?.moedas ?? 0), 0),
+    [minhasMissoes]
+  );
+
+  const colunas = useMemo(() => {
+    const novas = minhasMissoes.filter((p) => p.atual <= 0);
+    const emProgresso = minhasMissoes.filter((p) => p.atual > 0 && p.atual < (p.missions?.meta ?? 1));
+    const concluidas = minhasMissoes.filter((p) => p.atual >= (p.missions?.meta ?? 1));
+    return { novas, emProgresso, concluidas };
+  }, [minhasMissoes]);
+
+  async function moverProgresso(missionId: string, atualAlvo: number) {
+    setErro(null);
+    try {
+      await updateMyMissionProgress(missionId, atualAlvo);
+      await queryClient.invalidateQueries({ queryKey: ["mission-progress"] });
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível mover a missão.");
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -167,20 +194,24 @@ export default function Missoes() {
             Suas missões ativas, atualizadas em tempo real a partir do banco de dados.
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={abrirNova}>
-            <Plus size={16} /> Nova missão
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <Badge tone="brand" className="gap-1.5 py-1.5 text-[13px]">
+            Minhas Moedas: <strong className="font-display">{moedasGanhas}</strong> <Coins size={13} />
+          </Badge>
+          {isAdmin && (
+            <Button onClick={abrirNova}>
+              <Plus size={16} /> Nova missão
+            </Button>
+          )}
+        </div>
       </div>
 
       {erro && <p className="text-sm text-rust-500">{erro}</p>}
 
       <div>
-        <h2 className="mb-3 font-display text-sm font-semibold text-ink">Minhas missões</h2>
         {loadingProgress ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {Array.from({ length: 2 }).map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
               <CardSkeleton key={i} />
             ))}
           </div>
@@ -191,34 +222,66 @@ export default function Missoes() {
             description="Assuma uma missão disponível abaixo ou aguarde uma nova atribuição."
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {minhasMissoes.map((p) => {
-              const meta = p.missions?.meta ?? 1;
-              const pct = Math.min(100, Math.round((p.atual / meta) * 100));
-              const m = p.missions;
-              return (
-                <Card key={p.id} className="cursor-pointer" onClick={() => m && setDetalhe(m)}>
-                  <CardContent>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-display text-sm font-semibold text-ink">
-                          {m?.titulo}
-                        </h3>
-                        <p className="mt-1 text-sm text-ink/60">{m?.descricao}</p>
-                      </div>
-                      <Badge tone={pct >= 80 ? "success" : "warning"}>{pct}%</Badge>
-                    </div>
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-sand-bg">
-                      <div className="h-full rounded-full bg-forest-500" style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="mt-3 flex items-center gap-3">
-                      {m?.dificuldade && <Badge tone={dificuldadeTone[m.dificuldade]}>{m.dificuldade}</Badge>}
-                      <span className="flex items-center gap-1 text-xs text-ink/60"><Coins size={12} /> {m?.moedas} moedas</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="grid gap-4 md:grid-cols-3">
+            {(
+              [
+                { chave: "novas" as const, titulo: "Novas Missões", dot: "bg-amber-500", alvo: () => 0 },
+                {
+                  chave: "emProgresso" as const,
+                  titulo: "Missões em Progresso",
+                  dot: "bg-sky-500",
+                  alvo: (meta: number) => Math.min(Math.max(1, Math.ceil(meta / 2)), Math.max(meta - 1, 0)) || meta,
+                },
+                { chave: "concluidas" as const, titulo: "Missões Concluídas", dot: "bg-forest-500", alvo: (meta: number) => meta },
+              ]
+            ).map((col) => (
+              <div
+                key={col.chave}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const missionId = e.dataTransfer.getData("text/plain");
+                  const item = minhasMissoes.find((p) => p.mission_id === missionId);
+                  if (!item) return;
+                  const meta = item.missions?.meta ?? 1;
+                  const jaEstaAqui = colunas[col.chave].some((p) => p.mission_id === missionId);
+                  if (jaEstaAqui) return;
+                  moverProgresso(missionId, col.alvo(meta));
+                }}
+                className="rounded-2xl p-1"
+              >
+                <div className="mb-3 flex items-center gap-2">
+                  <h2 className="font-display text-sm font-semibold text-ink">{col.titulo}</h2>
+                  <Badge tone="neutral">{colunas[col.chave].length}</Badge>
+                </div>
+                <div className="min-h-[60px] space-y-3">
+                  {colunas[col.chave].length === 0 ? (
+                    <p className="text-xs text-ink/40">Arraste uma missão pra cá.</p>
+                  ) : (
+                    colunas[col.chave].map((p) => {
+                      const m = p.missions;
+                      return (
+                        <Card
+                          key={p.id}
+                          draggable
+                          onDragStart={(e) => e.dataTransfer.setData("text/plain", p.mission_id)}
+                          onClick={() => m && setDetalhe(m)}
+                          className="cursor-grab p-4 active:cursor-grabbing"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", col.dot)} />
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-sm font-semibold text-ink">{m?.titulo}</h3>
+                              <p className="mt-0.5 line-clamp-2 text-xs text-ink/50">{m?.descricao}</p>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
