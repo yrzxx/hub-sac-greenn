@@ -167,9 +167,9 @@ export default function Nps() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="NPS Score" value={stats.score !== null ? String(stats.score) : "—"} icon={Gauge} />
-        <Kpi label="Promotores" value={`${stats.promotores} (${stats.total ? Math.round((stats.promotores / stats.total) * 100) : 0}%)`} />
-        <Kpi label="Neutros" value={`${stats.neutros} (${stats.total ? Math.round((stats.neutros / stats.total) * 100) : 0}%)`} />
-        <Kpi label="Detratores" value={`${stats.detratores} (${stats.total ? Math.round((stats.detratores / stats.total) * 100) : 0}%)`} />
+        <Kpi label="Promotores" value={`${stats.promotores} (${stats.total ? Math.round((stats.promotores / stats.total) * 100) : 0}%)`} valueClassName="text-forest-600" />
+        <Kpi label="Neutros" value={`${stats.neutros} (${stats.total ? Math.round((stats.neutros / stats.total) * 100) : 0}%)`} valueClassName="text-amber-600" />
+        <Kpi label="Detratores" value={`${stats.detratores} (${stats.total ? Math.round((stats.detratores / stats.total) * 100) : 0}%)`} valueClassName="text-rust-600" />
       </div>
 
       <Card>

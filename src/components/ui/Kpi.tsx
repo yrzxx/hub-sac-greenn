@@ -10,9 +10,10 @@ interface KpiProps {
   meta?: string;
   icon?: LucideIcon;
   invertDeltaColor?: boolean; // ex: tempo médio, onde delta negativo é bom
+  valueClassName?: string; // ex: "text-forest-600" pra colorir o valor (promotor/neutro/detrator)
 }
 
-export function Kpi({ label, value, delta, meta, icon: Icon, invertDeltaColor }: KpiProps) {
+export function Kpi({ label, value, delta, meta, icon: Icon, invertDeltaColor, valueClassName }: KpiProps) {
   const isPositive = (delta ?? 0) >= 0;
   const isGood = invertDeltaColor ? !isPositive : isPositive;
 
@@ -27,7 +28,7 @@ export function Kpi({ label, value, delta, meta, icon: Icon, invertDeltaColor }:
         )}
       </div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
-        <span className="font-display text-kpi-lg tracking-tight text-ink tabular-nums">
+        <span className={`font-display text-kpi-lg tracking-tight tabular-nums ${valueClassName ?? "text-ink"}`}>
           {value}
         </span>
         {meta && <span className="text-[11px] text-ink/40">/ {meta}</span>}

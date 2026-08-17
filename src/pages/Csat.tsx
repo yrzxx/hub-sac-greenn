@@ -225,17 +225,20 @@ export default function Csat() {
             label="Promotores"
             value={`${resumoAtual.promotores} / ${resumoAtual.total ? ((resumoAtual.promotores / resumoAtual.total) * 100).toFixed(0) : 0}%`}
             delta={deltaRelativo(resumoAtual.promotores, resumoAnterior.promotores)}
+            valueClassName="text-forest-600"
           />
           <Kpi
             label="Neutros"
             value={`${resumoAtual.neutros} / ${resumoAtual.total ? ((resumoAtual.neutros / resumoAtual.total) * 100).toFixed(0) : 0}%`}
             delta={deltaRelativo(resumoAtual.neutros, resumoAnterior.neutros)}
+            valueClassName="text-amber-600"
           />
           <Kpi
             label="Detratores"
             value={`${resumoAtual.detratores} / ${resumoAtual.total ? ((resumoAtual.detratores / resumoAtual.total) * 100).toFixed(0) : 0}%`}
             delta={deltaRelativo(resumoAtual.detratores, resumoAnterior.detratores)}
             invertDeltaColor
+            valueClassName="text-rust-600"
           />
         </div>
       )}
