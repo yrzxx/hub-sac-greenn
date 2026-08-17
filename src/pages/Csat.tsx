@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Kpi } from "@/components/ui/Kpi";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { BarChart, corPorFaixa } from "@/components/ui/BarChart";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchDistinctOperadores, fetchCsatFiltered, fetchCsatForDashboard, fetchAtendenteAliases } from "@/services/api";
@@ -24,7 +25,7 @@ import { DateRangePopover } from "@/components/ui/DateRangePopover";
 const PAGE_SIZE = 10;
 
 export default function Csat() {
-  const [aba, setAba] = useState<"planilha" | "dashboard">("planilha");
+  const [aba, setAba] = useState<"planilha" | "dashboard">("dashboard");
   const [preset, setPreset] = useState<PeriodoPreset>("30dias");
   const [personalizado, setPersonalizado] = useState({ inicio: "", fim: "" });
   const [busca, setBusca] = useState("");
@@ -391,6 +392,19 @@ export default function Csat() {
               <FileDown size={14} /> Exportar dashboard em PDF
             </Button>
           </div>
+          <Card className="p-5">
+            <h2 className="mb-3 font-display text-sm font-semibold text-ink">CSAT por colaborador</h2>
+            <BarChart
+              data={[...porColaborador]
+                .sort((a, b) => (b.percentual ?? 0) - (a.percentual ?? 0))
+                .map((c) => ({
+                  label: c.atendente?.split(" ")[0] ?? "—",
+                  value: c.percentual ?? 0,
+                  displayValue: c.percentual !== null ? `${c.percentual.toFixed(0)}%` : "—",
+                }))}
+              getColorClass={corPorFaixa}
+            />
+          </Card>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {porColaborador.map((c) => (
             <Card key={c.uid} className="p-5">
