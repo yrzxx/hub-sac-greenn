@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Download, ArrowUpDown, Star, FileDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Search, Download, ArrowUpDown, Star, FileDown, ArrowUpRight, ArrowDownRight, SlidersHorizontal, Check } from "lucide-react";
 import { cn, formatDelta } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +23,129 @@ import {
 import { DateRangePopover } from "@/components/ui/DateRangePopover";
 
 const PAGE_SIZE = 10;
+
+const CLASSIFICACAO_OPTIONS = [
+  ["", "Todas as classificações"],
+  ["Promotor", "Promotor"],
+  ["Neutro", "Neutro"],
+  ["Detrator", "Detrator"],
+] as const;
+
+interface CsatFiltrosState {
+  emailAtendente: string;
+  topico: string;
+  categoriaCliente: string;
+  nota: string;
+  classificacaoCsat: "" | "Promotor" | "Neutro" | "Detrator";
+}
+
+function FiltrosPopover({
+  filtros,
+  onChange,
+  operadores,
+  topicos,
+}: {
+  filtros: CsatFiltrosState;
+  onChange: (f: CsatFiltrosState) => void;
+  operadores: { email_atendente: string | null; atendente: string }[];
+  topicos: (string | null)[];
+}) {
+  const [aberto, setAberto] = useState(false);
+  const ativos = Object.values(filtros).filter(Boolean).length;
+
+  return (
+    <div className="relative">
+      {aberto && <div className="fixed inset-0 z-10" onClick={() => setAberto(false)} />}
+      <button
+        onClick={() => setAberto((a) => !a)}
+        className="flex h-9 items-center gap-1.5 rounded-lg border border-sand-line bg-white px-3 text-sm text-ink/70 transition-colors hover:border-sand-line-strong"
+      >
+        <SlidersHorizontal size={14} className="text-ink/40" />
+        Filtros
+        {ativos > 0 && <Badge tone="brand" className="h-4 min-w-[16px] justify-center px-1 text-[10px]">{ativos}</Badge>}
+      </button>
+
+      {aberto && (
+        <div className="absolute right-0 top-full z-20 mt-1.5 w-64 space-y-3 rounded-xl border border-sand-line bg-white p-3 shadow-float">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/50">Colaborador</label>
+            <select
+              value={filtros.emailAtendente}
+              onChange={(e) => onChange({ ...filtros, emailAtendente: e.target.value })}
+              className="w-full rounded-lg border border-sand-line px-2 py-1.5 text-sm"
+            >
+              <option value="">Todos os colaboradores</option>
+              {operadores.map((o) => (
+                <option key={o.email_atendente ?? o.atendente} value={o.email_atendente ?? ""}>{o.atendente}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/50">Categoria</label>
+            <select
+              value={filtros.topico}
+              onChange={(e) => onChange({ ...filtros, topico: e.target.value })}
+              className="w-full rounded-lg border border-sand-line px-2 py-1.5 text-sm"
+            >
+              <option value="">Todas as categorias</option>
+              {topicos.map((t) => <option key={t} value={t!}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/50">Tipo de cliente</label>
+            <select
+              value={filtros.categoriaCliente}
+              onChange={(e) => onChange({ ...filtros, categoriaCliente: e.target.value })}
+              className="w-full rounded-lg border border-sand-line px-2 py-1.5 text-sm"
+            >
+              <option value="">Todos os tipos de cliente</option>
+              <option value="Consumidor">Consumidor</option>
+              <option value="Produtor">Produtor</option>
+              <option value="Não identificado">Não identificado</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/50">Nota</label>
+            <select
+              value={filtros.nota}
+              onChange={(e) => onChange({ ...filtros, nota: e.target.value })}
+              className="w-full rounded-lg border border-sand-line px-2 py-1.5 text-sm"
+            >
+              <option value="">Todas as notas</option>
+              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/50">Classificação</label>
+            <div className="space-y-0.5">
+              {CLASSIFICACAO_OPTIONS.map(([valor, label]) => (
+                <button
+                  key={valor}
+                  onClick={() => onChange({ ...filtros, classificacaoCsat: valor })}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-sand-subtle",
+                    filtros.classificacaoCsat === valor && "bg-forest-50 text-forest-700"
+                  )}
+                >
+                  {label}
+                  {filtros.classificacaoCsat === valor && <Check size={14} />}
+                </button>
+              ))}
+            </div>
+          </div>
+          {ativos > 0 && (
+            <button
+              onClick={() => onChange({ emailAtendente: "", topico: "", categoriaCliente: "", nota: "", classificacaoCsat: "" })}
+              className="w-full rounded-lg border border-sand-line py-1.5 text-xs text-ink/60 hover:bg-sand-subtle"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Csat() {
   const [aba, setAba] = useState<"planilha" | "dashboard">("dashboard");
@@ -206,10 +329,15 @@ export default function Csat() {
             onChangePersonalizado={setPersonalizado}
           />
           <SegmentedControl
-            options={[["planilha", "Planilha"], ["dashboard", "Dashboard"]] as const}
+            options={[["dashboard", "Dashboard"], ["planilha", "Planilha"]] as const}
             value={aba}
             onChange={setAba}
           />
+          {aba === "planilha" && (
+            <Button variant="secondary" size="sm" onClick={exportar}>
+              <Download size={14} /> Exportar CSV
+            </Button>
+          )}
         </div>
       </div>
 
@@ -253,35 +381,18 @@ export default function Csat() {
             className="h-9 rounded-lg border border-sand-line bg-white pl-8 pr-2 text-sm outline-none focus:border-forest-500"
           />
         </div>
-        <select value={emailAtendente} onChange={(e) => setEmailAtendente(e.target.value)} className="h-9 rounded-lg border border-sand-line bg-white px-2 text-sm">
-          <option value="">Todos os colaboradores</option>
-          {(operadores ?? []).map((o) => (
-            <option key={o.email_atendente ?? o.atendente} value={o.email_atendente ?? ""}>{o.atendente}</option>
-          ))}
-        </select>
-        <select value={topico} onChange={(e) => setTopico(e.target.value)} className="h-9 rounded-lg border border-sand-line bg-white px-2 text-sm">
-          <option value="">Todas as categorias</option>
-          {topicos.map((t) => <option key={t} value={t!}>{t}</option>)}
-        </select>
-        <select value={categoriaCliente} onChange={(e) => setCategoriaCliente(e.target.value)} className="h-9 rounded-lg border border-sand-line bg-white px-2 text-sm">
-          <option value="">Todos os tipos de cliente</option>
-          <option value="Consumidor">Consumidor</option>
-          <option value="Produtor">Produtor</option>
-          <option value="Não identificado">Não identificado</option>
-        </select>
-        <select value={nota} onChange={(e) => setNota(e.target.value)} className="h-9 rounded-lg border border-sand-line bg-white px-2 text-sm">
-          <option value="">Todas as notas</option>
-          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <select value={classificacaoCsat} onChange={(e) => setClassificacaoCsat(e.target.value as "" | "Promotor" | "Neutro" | "Detrator")} className="h-9 rounded-lg border border-sand-line bg-white px-2 text-sm">
-          <option value="">Todas as classificações</option>
-          <option value="Promotor">Promotor</option>
-          <option value="Neutro">Neutro</option>
-          <option value="Detrator">Detrator</option>
-        </select>
-        <Button variant="secondary" size="sm" onClick={exportar} className="ml-auto">
-          <Download size={14} /> Exportar CSV
-        </Button>
+        <FiltrosPopover
+          filtros={{ emailAtendente, topico, categoriaCliente, nota, classificacaoCsat }}
+          onChange={(f) => {
+            setEmailAtendente(f.emailAtendente);
+            setTopico(f.topico);
+            setCategoriaCliente(f.categoriaCliente);
+            setNota(f.nota);
+            setClassificacaoCsat(f.classificacaoCsat);
+          }}
+          operadores={operadores ?? []}
+          topicos={topicos}
+        />
       </Card>
 
       {aba === "planilha" ? (
