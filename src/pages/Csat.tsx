@@ -10,7 +10,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { BarChart, corPorFaixa } from "@/components/ui/BarChart";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { fetchDistinctOperadores, fetchCsatFiltered, fetchCsatForDashboard, fetchAtendenteAliases } from "@/services/api";
+import { fetchDistinctOperadores, fetchCsatFiltered, fetchCsatForDashboard, fetchAtendenteAliases, fetchDashboardAtendimentoSummary } from "@/services/api";
 import type { CsatFilters } from "@/services/api";
 import { exportCsatToCsv } from "@/lib/exportCsv";
 import { exportCsatDashboardToPdf } from "@/lib/exportPdf";
@@ -23,6 +23,19 @@ import {
 import { DateRangePopover } from "@/components/ui/DateRangePopover";
 
 const PAGE_SIZE = 10;
+
+// Regra oficial de CSAT positivo: (notas 4 e 5) / total de respostas válidas.
+// Não usar média das notas normalizada — isso conta nota 3 como "60% positivo",
+// o que infla o número. Média das notas é uma métrica separada, mostrada à parte.
+function calcularCsat(notas: number[]) {
+  const total = notas.length;
+  const positivas = notas.filter((n) => n >= 4).length;
+  return {
+    total,
+    positivoPct: total ? (positivas / total) * 100 : null,
+    media: total ? notas.reduce((a, b) => a + b, 0) / total : null,
+  };
+}
 
 const CLASSIFICACAO_OPTIONS = [
   ["", "Todas as classificações"],
@@ -200,6 +213,15 @@ export default function Csat() {
     enabled: aba === "dashboard",
   });
 
+  // Denominador da "taxa de resposta da pesquisa": aproximação por
+  // conversas resolvidas no período (não temos, hoje, quantas pesquisas
+  // foram efetivamente enviadas pelo Crisp — só quem respondeu).
+  const { data: resumoAtendimento } = useQuery({
+    queryKey: ["dashboard-atendimento-summary", inicio, fim],
+    queryFn: () => fetchDashboardAtendimentoSummary(inicio, fim),
+    enabled: aba === "dashboard",
+  });
+
   function alternarOrdenacao(campo: string) {
     if (sortBy === campo) setSortAsc(!sortAsc);
     else {
@@ -248,17 +270,14 @@ export default function Csat() {
       map.set(chave, entry);
     });
     return Array.from(map.entries()).map(([chave, v]) => {
-      const media = v.notas.length ? v.notas.reduce((a, b) => a + b, 0) / v.notas.length : null;
-      const percentual = media !== null ? (media / 5) * 100 : null;
+      const { positivoPct: percentual, media } = calcularCsat(v.notas);
 
       const notasAnteriores = (dashboardAnterior ?? [])
         .filter((r) => normalizarChave(r.email_atendente, r.atendente).chave === chave && r.nota !== null)
         .map((r) => r.nota as number);
-      const mediaAnterior = notasAnteriores.length
-        ? notasAnteriores.reduce((a, b) => a + b, 0) / notasAnteriores.length
-        : null;
+      const { positivoPct: percentualAnterior } = calcularCsat(notasAnteriores);
       const evolucao =
-        media !== null && mediaAnterior ? ((media - mediaAnterior) / mediaAnterior) * 100 : undefined;
+        percentual !== null && percentualAnterior ? ((percentual - percentualAnterior) / percentualAnterior) * 100 : undefined;
 
       return {
         uid: chave,
@@ -292,18 +311,18 @@ export default function Csat() {
     const rows = dashboardRows ?? [];
     const total = rows.length;
     const notas = rows.map((r) => r.nota).filter((n): n is number => n !== null);
-    const csatPercent = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length / 5) * 100 : null;
+    const { positivoPct: csatPercent, media: mediaNotas } = calcularCsat(notas);
     const promotores = rows.filter((r) => r.classificacao_csat === "Promotor").length;
     const neutros = rows.filter((r) => r.classificacao_csat === "Neutro").length;
     const detratores = rows.filter((r) => r.classificacao_csat === "Detrator").length;
-    return { total, csatPercent, promotores, neutros, detratores };
+    return { total, csatPercent, mediaNotas, promotores, neutros, detratores };
   }, [dashboardRows]);
 
   const resumoAnterior = useMemo(() => {
     const rows = dashboardAnterior ?? [];
     const total = rows.length;
     const notas = rows.map((r) => r.nota).filter((n): n is number => n !== null);
-    const csatPercent = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length / 5) * 100 : null;
+    const { positivoPct: csatPercent } = calcularCsat(notas);
     const promotores = rows.filter((r) => r.classificacao_csat === "Promotor").length;
     const neutros = rows.filter((r) => r.classificacao_csat === "Neutro").length;
     const detratores = rows.filter((r) => r.classificacao_csat === "Detrator").length;
@@ -342,12 +361,26 @@ export default function Csat() {
       </div>
 
       {aba === "dashboard" && !loadingDashboard && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <Kpi label="Total de Avaliações" value={String(resumoAtual.total)} delta={deltaRelativo(resumoAtual.total, resumoAnterior.total)} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Kpi
-            label="CSAT"
+            label="CSAT positivo"
             value={resumoAtual.csatPercent !== null ? `${resumoAtual.csatPercent.toFixed(1)}%` : "—"}
             delta={deltaRelativo(resumoAtual.csatPercent ?? 0, resumoAnterior.csatPercent ?? 0)}
+            meta="notas 4 e 5"
+          />
+          <Kpi
+            label="Média das notas"
+            value={resumoAtual.mediaNotas !== null ? `${resumoAtual.mediaNotas.toFixed(1)}/5` : "—"}
+          />
+          <Kpi label="Total de Avaliações" value={String(resumoAtual.total)} delta={deltaRelativo(resumoAtual.total, resumoAnterior.total)} />
+          <Kpi
+            label="Taxa de resposta"
+            value={
+              resumoAtendimento?.conversas_resolvidas
+                ? `${((resumoAtual.total / resumoAtendimento.conversas_resolvidas) * 100).toFixed(0)}%`
+                : "—"
+            }
+            meta="aprox. vs. resolvidos"
           />
           <Kpi
             label="Promotores"
@@ -532,12 +565,15 @@ export default function Csat() {
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-sand-line bg-sand-bg/60 p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-ink/40">CSAT</p>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-ink/40">CSAT positivo</p>
                   <p className="mt-1 flex items-baseline gap-1">
                     <span className="font-display text-lg font-semibold text-ink tabular-nums">
                       {c.percentual !== null ? `${c.percentual.toFixed(1)}%` : "—"}
                     </span>
                     <span className="text-[11px] text-ink/40">/ {rotuloCsat(c.percentual)}</span>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink/40">
+                    {c.media !== null ? `${c.media.toFixed(1)}/5 de média` : "sem nota"}
                   </p>
                   <p
                     className={cn(
