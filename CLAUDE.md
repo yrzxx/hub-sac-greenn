@@ -723,10 +723,16 @@ Eduardo, enquanto um trecho de ~86min genuinamente `pending` (aberto, sem
 retomada) continuou contando normalmente — confirma que o corte é por
 estado real, não por tempo parado em geral.
 
-Com mais alguns dias de dado real acumulado, `relogio_espera_cliente()`
-pode ganhar o mesmo tratamento de fonte por evento (hoje continua só por
-aproximação de mensagem, restrita a resolvidas) — única pendência restante
-deste bloco.
+**Fix aplicado em 2026-08-18 (mais tarde) — `relogio_espera_cliente()`
+ganhou o mesmo tratamento por evento que a posse:** mesma estrutura em 2
+níveis — Tier A (sessão com `crisp_conversation_state_history` real) já
+não exige mais `status = 'resolved'` pra contar espera, e corta cada gap
+de espera na 1ª resolução real que acontecer dentro dele (em vez de só
+aceitar ou rejeitar o gap inteiro); Tier B (sem histórico de estado ainda)
+mantém o comportamento antigo. Efeito prático validado: amostras do dia
+foram de 7 pra 11 janelas de espera — passou a contar chamados ainda
+abertos/pendentes, que antes ficavam de fora só por não estarem
+resolvidos ainda.
 
 **Reorganização em 2026-08-18 — Performance virou Overview, Analytics
 ficou leve:** por pedido explícito do usuário, Analytics (`/analytics`)
