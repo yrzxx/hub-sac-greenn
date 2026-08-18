@@ -772,10 +772,9 @@ e-mail `allan@gdigital.com.br`, role `owner`), que recebe roteamento real
 (`session:set_routing`) e portanto conta normalmente na posse — é essa
 conta que gera as 150h+, somando muitas conversas ainda `pending`. Não é
 bug de cálculo, é uma segunda identidade real que só coincide no nome de
-exibição. Pendente: confirmar com o time se essa conta `b8b993a0-...` é
-mesmo o bot operando via conta própria na Crisp ou se é nome confuso de
-outra coisa — se for o caso, considerar renomear o alias em
-`operator_id_aliases` pra diferenciar visualmente das duas.
+exibição. **Confirmado pelo usuário em 2026-08-18**: `b8b993a0-...`
+(`allan@gdigital.com.br`) é mesmo a conta usada pra criação/configuração
+do bot — é o bot legítimo, não confusão de nome. Alias mantido como está.
 
 ## 11. Principais componentes reutilizáveis
 
