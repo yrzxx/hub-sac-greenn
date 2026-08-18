@@ -69,6 +69,15 @@ function corBacklogFaixa(faixa: string) {
   return "text-rust-500";
 }
 
+function corBacklogBarra(faixa: string) {
+  if (faixa === "0-1 dia") return "bg-forest-500";
+  if (faixa === "2-3 dias") return "bg-amber-500";
+  if (faixa === "4-7 dias") return "bg-rust-400";
+  return "bg-rust-600";
+}
+
+const CORES_VIVAS = ["bg-sky-500", "bg-violet-500", "bg-forest-500", "bg-amber-500", "bg-rust-400", "bg-sky-400", "bg-violet-400"];
+
 type RankingCampo = "total_atendimentos" | "tfr_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
 
 export default function Performance() {
@@ -272,6 +281,17 @@ export default function Performance() {
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Avaliações ruins (1–2)</p>
                 <p className="mt-1 font-display text-kpi-lg font-bold text-rust-600">{csatDist.ruins}</p>
               </Card>
+              <Card className="p-4 sm:col-span-3">
+                <BarChart
+                  data={[
+                    { label: "Boas (4–5)", value: csatDist.boas },
+                    { label: "Neutras (3)", value: csatDist.neutras },
+                    { label: "Ruins (1–2)", value: csatDist.ruins },
+                  ]}
+                  getColorClass={(_, i) => ["bg-forest-500", "bg-amber-500", "bg-rust-500"][i ?? 0]}
+                  height={110}
+                />
+              </Card>
             </div>
           )}
 
@@ -375,6 +395,19 @@ export default function Performance() {
                   })}
                 </tbody>
               </table>
+            </Card>
+          )}
+
+          {rankingHumano && rankingHumano.length > 0 && (
+            <Card className="p-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/40">Volume de atendimentos por pessoa</p>
+              <BarChart
+                data={[...rankingHumano]
+                  .sort((a, b) => b.total_atendimentos - a.total_atendimentos)
+                  .map((r) => ({ label: r.operator_nome.split(" ")[0], value: r.total_atendimentos }))}
+                getColorClass={(_, i) => CORES_VIVAS[i % CORES_VIVAS.length]}
+                height={110}
+              />
             </Card>
           )}
           <p className="text-xs text-ink/40">
@@ -484,6 +517,18 @@ export default function Performance() {
                   );
                 })}
               </div>
+            )}
+            {backlog && backlog.some((b) => b.total > 0) && (
+              <Card className="mt-4 p-4">
+                <BarChart
+                  data={(["0-1 dia", "2-3 dias", "4-7 dias", "+7 dias"] as const).map((faixa) => ({
+                    label: faixa,
+                    value: backlog.find((b) => b.faixa === faixa)?.total ?? 0,
+                  }))}
+                  getColorClass={(_, i) => corBacklogBarra((["0-1 dia", "2-3 dias", "4-7 dias", "+7 dias"] as const)[i])}
+                  height={110}
+                />
+              </Card>
             )}
             <p className="mt-2 text-xs text-ink/40">
               Total em aberto: {backlog?.reduce((acc, b) => acc + b.total, 0) ?? 0} chamados. Evolução histórica do
@@ -637,6 +682,17 @@ export default function Performance() {
               <Card className="p-4"><p className="text-sm text-ink/50">Sem tópico classificado no período ainda — a Crisp classifica de forma assíncrona, só depois que um atendente responde.</p></Card>
             ) : (
               <>
+                <Card className="mb-4 p-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/40">Top 8 tópicos por volume</p>
+                  <BarChart
+                    data={[...motivos]
+                      .sort((a, b) => b.chamados - a.chamados)
+                      .slice(0, 8)
+                      .map((m) => ({ label: m.topico.split(" ").slice(0, 2).join(" "), value: m.chamados }))}
+                    getColorClass={(_, i) => CORES_VIVAS[i % CORES_VIVAS.length]}
+                    height={120}
+                  />
+                </Card>
                 <Card className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-sand-bg text-center text-xs uppercase tracking-wide text-ink/50">
