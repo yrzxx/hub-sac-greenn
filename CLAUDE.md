@@ -652,13 +652,53 @@ duas fontes nunca se misturam para a mesma conversa. Validado com dado real:
 duas conversas abertas (`pending`) do dia 2026-08-18 já aparecem com posse
 calculada corretamente até `now()`.
 
-Ainda pendente: confirmar em produção que a lógica de reabertura
-(`reopened_count`/`first_resolved_at` via `session:set_state`, código já
-preparado nos nós `Code in JavaScript`/`HTTP Request3` do n8n) está
-realmente incrementando — não testado ainda com uma reabertura real. E,
-com mais alguns dias de dado real acumulado em `operator_routing_history`,
-`relogio_espera_cliente()` pode ganhar o mesmo tratamento (hoje continua só
-por aproximação de mensagem, restrita a resolvidas).
+**Validado em 2026-08-18 com teste real ponta a ponta**: reabriu-se um
+chamado de teste (cliente respondendo depois de resolvido) e um segundo
+atendente assumiu no meio — `reopened_count` incrementou pra 1,
+`first_resolved_at` permaneceu intocado, `resolved_at` voltou a `null`, e
+`operator_routing_history` registrou os 3 eventos de roteamento (Eduardo →
+Ana Paula → Eduardo) com os tempos certos. Pipeline confirmado funcionando
+só com o Plugin Hook, sem o Website Hook antigo.
+
+**Gap descoberto nesse mesmo teste**: `relogio_posse_periodo()` fecha cada
+janela de posse só no próximo evento de roteamento — ela **não corta a
+janela na resolução/reabertura**. Resultado: se um chamado fica parado
+(resolvido) por um tempo antes de reabrir, esse tempo parado é somado à
+posse de quem tinha o chamado antes de resolver, como se fosse trabalho
+ativo. Causa raiz: só guardamos `resolved_at`/`first_resolved_at`/
+`reopened_count` como campos escalares (valor atual), sem histórico
+carimbado de cada mudança de estado — diferente do roteamento, que agora
+tem `operator_routing_history` evento a evento. Correção proposta e ainda
+não implementada: criar uma tabela de histórico de estado (`session_id`,
+`state`, `event_at`) populada a cada `session:set_state`, e fazer
+`relogio_posse_periodo()` cortar cada run tanto no próximo roteamento
+quanto na resolução/reabertura, o que vier primeiro.
+
+**`operator_id_aliases` populada para todo o time em 2026-08-18**: puxada
+a lista completa de operadores via API REST do Crisp
+(`GET /v1/website/{website_id}/operators/list`, autenticação por Plugin
+Token — `Authorization: Basic BASE64(identifier:key)` + header
+`X-Crisp-Tier: plugin`, obrigatório pra tokens de plugin, senão dá
+`invalid_session`) — 21 operadores cadastrados de uma vez, incluindo nomes
+que antes só apareciam via fallback de mensagem ou ficavam com ID cru.
+Resolveu também uma pendência de 17/08: o atendente "Paula" (2
+atendimentos, sem alias por precaução) é **Paula Pimentel**
+(`e4dbb36f-53a3-4bb7-836f-0975cdc6f9e7`), pessoa diferente da Ana Paula
+Maximiano de Souza — confirmado pela API, não por suposição.
+
+**Dado de teste limpo em 2026-08-18**: como o app ainda não está em
+produção (só local), `crisp_conversations`, `crisp_messages`,
+`csat_results`, `nps_responses` e `operator_routing_history` foram
+zeradas por decisão consciente do usuário, pra não misturar o histórico
+acumulado antes do pipeline de eventos reais estar completo com dado novo
+e confiável daqui pra frente. `operator_id_aliases` foi mantida (não é
+dado do pipeline, é configuração).
+
+Ainda pendente: implementar o corte de posse na resolução/reabertura
+(gap acima). Com mais alguns dias de dado real acumulado em
+`operator_routing_history`, `relogio_espera_cliente()` pode ganhar o
+mesmo tratamento de fonte por evento (hoje continua só por aproximação de
+mensagem, restrita a resolvidas).
 
 ## 11. Principais componentes reutilizáveis
 
