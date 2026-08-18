@@ -723,10 +723,220 @@ Eduardo, enquanto um trecho de ~86min genuinamente `pending` (aberto, sem
 retomada) continuou contando normalmente — confirma que o corte é por
 estado real, não por tempo parado em geral.
 
-Com mais alguns dias de dado real acumulado, `relogio_espera_cliente()`
-pode ganhar o mesmo tratamento de fonte por evento (hoje continua só por
-aproximação de mensagem, restrita a resolvidas) — única pendência restante
-deste bloco.
+**Fix aplicado em 2026-08-18 (mais tarde) — `relogio_espera_cliente()`
+ganhou o mesmo tratamento por evento que a posse:** mesma estrutura em 2
+níveis — Tier A (sessão com `crisp_conversation_state_history` real) já
+não exige mais `status = 'resolved'` pra contar espera, e corta cada gap
+de espera na 1ª resolução real que acontecer dentro dele (em vez de só
+aceitar ou rejeitar o gap inteiro); Tier B (sem histórico de estado ainda)
+mantém o comportamento antigo. Efeito prático validado: amostras do dia
+foram de 7 pra 11 janelas de espera — passou a contar chamados ainda
+abertos/pendentes, que antes ficavam de fora só por não estarem
+resolvidos ainda.
+
+**Reorganização em 2026-08-18 — Performance virou Overview, Analytics
+ficou leve:** por pedido explícito do usuário, Analytics (`/analytics`)
+passou a ser o painel leve pra qualquer colaborador (indicadores básicos,
+evolução, distribuição por canal/status/tópico, ranking de operadores) —
+todo o conteúdo pesado que tinha sido adicionado ali na Fase 1 (Velocidade
+com percentis TFR/TTR, Backlog por idade, Relógios do atendimento, QA)
+foi movido pra `/performance`, renomeada de "Performance" pra **"Overview"**
+(título, sidebar, busca global, `public.modules.nome` — rota e slug
+técnico continuam `/performance`/`performance` por decisão consciente,
+só o nome de exibição mudou). Overview é agora a página principal pro
+admin bater o olho e entender como o time está — a sub-aba "Ranking" virou
+"Dashboard" e concentra tudo isso mais o ranking de atendentes; a aba
+"Atendimentos" ficou só com a lista crua de chamados (filtros + tabela),
+sem os blocos agregados.
+
+Nessa mesma leva: card "Destaque em volume" e lista "Conversas com nota
+baixa" foram removidos do Dashboard, substituídos por 3 cards de
+distribuição de nota (`csat_distribuicao_notas()`, boas 4-5/neutras
+3/ruins 1-2). Nova seção **"Motivo de contato"** (usa `topico`, ver seção
+anterior) ficou como último bloco da aba Dashboard — agrupa por tópico com
+volume + TFR/TTR médio via `motivo_contato_resumo()`; ainda fragmentado
+(tópico é resumo livre por conversa, não categoria fixa), reavaliar
+agrupamento quando tiver mais volume real. Clique num atendente na tabela
+de Relógio de posse abre um popup com os chamados dele no período
+(reaproveita `fetchAtendimentosComMetricas` filtrado por atendente). Os
+cards de Velocidade ganharam um botão "ver mais" com popup explicando
+P50/P90/P95/SLA/média. Cores: CSAT médio, SLA cumprido e faixas de backlog
+seguem verde/amarelo/vermelho em negrito, mesma lógica de faixa usada no
+CSAT (`corPorFaixa`).
+
+**Achado em 2026-08-18 — existem duas "IA Greenn" diferentes no Crisp,
+não confundir:** ao investigar por que a posse da "IA Greenn" aparecia
+muito alta (150h+), achei que são duas identidades distintas: (1) o
+marcador sintético `operator_crisp_id = "ia_greenn"` (string literal,
+não é UUID) que o n8n atribui em `Code - Send`/`Code - Received` quando
+`data.automated === true` — esse é **excluído de propósito** do cálculo
+de posse (`relogio_posse_periodo`) e da 1ª resposta humana, nunca aparece
+em `operator_routing_history` porque não é um operador real da Crisp; e
+(2) uma **conta de operador de verdade** na Crisp, também chamada "IA
+Greenn" (`operator_crisp_id = "b8b993a0-dd61-487a-b89b-7503756d8eb2"`,
+e-mail `allan@gdigital.com.br`, role `owner`), que recebe roteamento real
+(`session:set_routing`) e portanto conta normalmente na posse — é essa
+conta que gera as 150h+, somando muitas conversas ainda `pending`. Não é
+bug de cálculo, é uma segunda identidade real que só coincide no nome de
+exibição. **Confirmado pelo usuário em 2026-08-18**: `b8b993a0-...`
+(`allan@gdigital.com.br`) é mesmo a conta usada pra criação/configuração
+do bot — é o bot legítimo, não confusão de nome. Alias mantido como está.
+
+**Bug crítico corrigido em 2026-08-18 — detecção de bot por
+`operator_nome ilike '%IA%'` excluía/incluía gente errada:** ao investigar
+por que "Nathalia Cavalcanti" e "Ana Paula Maximiano de Souza" apareciam
+com TFR "—" (nenhuma amostra) mesmo tendo respondido chamados de verdade,
+achei que o padrão usado em **4 funções** pra identificar bot por nome —
+`operator_nome ilike '%IA%'` — também casa com qualquer nome que contenha
+"ia" como substring em qualquer posição: "Nathal**ia**", "Max**ia**no"
+(dentro de "Maximiano"). Resultado: 32 mensagens reais dessas duas
+pessoas eram tratadas como se fossem do bot e excluídas de
+`_primeiras_respostas_humanas()` — o que também explicava a inflação de
+`tempo_resposta_bot()` (mensagens humanas rápidas sendo contadas como se
+fossem do bot) e outros números estranhos: `relogio_espera_cliente()` e
+o Tier C de `relogio_posse_periodo()` tinham o mesmo problema.
+
+Verificação com dado real: toda mensagem genuína do bot tem
+`operator_nome` exatamente `"Atendente IA Greenn"` (nunca variação) e
+`origin` em `urn:crisp.im:bot:0` ou `urn:allan.godoy:greenn:0` (integração
+própria do bot, mensagens que não passam pelo canal `crisp.im:bot`
+padrão). As 32 mensagens humanas mal-classificadas tinham `origin = "chat"`
+e nome exatamente "Nathalia"/"Nathalia Cavalcanti"/"Ana Paula Maximiano de
+Souza" — nunca `origin` de bot.
+
+Corrigido nas 4 funções (`_primeiras_respostas_humanas`,
+`relogio_espera_cliente`, `relogio_posse_periodo`, `tempo_resposta_bot`)
+trocando o padrão solto por um ancorado: `operator_nome ilike 'Atendente
+IA%'` (prefixo, não substring solta) **or** `origin ilike '%crisp.im:bot%'`
+**or** `origin ilike '%allan.godoy%'`. Como `atendente_performance`,
+`tfr_ttr_percentis`, `atendimentos_com_metricas` e `motivo_contato_resumo`
+só consomem `_primeiras_respostas_humanas()` (não reimplementam a
+detecção), corrigir na fonte já resolveu pra todas — nenhuma delas
+precisou de alteração própria. Validado: `tempo_resposta_bot()` caiu de
+195,7s de média (com outlier de 4h de uma mensagem tardia da Nathalia) pra
+14,7s (mediana real do bot); Nathalia passou a mostrar TFR real (2h14min,
+não mais "—").
+
+Nesse mesmo lote: card dedicado "Bot (IA Greenn)" no Overview, separado
+da tabela de Ranking humano e do gráfico de posse — ficava estranho
+comparar volume/CSAT do bot lado a lado com atendentes reais, e clicar no
+card abre o mesmo popup de chamados usado nas linhas de posse.
+
+**Auditoria em 2026-08-18 — TFR do Meu Painel divergia do Overview:**
+usuário notou que "tempo de primeira resposta" no Meu Painel batia
+diferente do Ranking no Overview. Causa: `minhas_conversas_metricas()`
+(usada só pelo Meu Painel) calculava `tempo_primeira_resposta_seg` a
+partir de `primeira_resposta_humana_at` **sem checar se o usuário logado
+foi de fato quem respondeu primeiro** — só filtrava "conversas onde eu
+sou o operador atual" e pegava o tempo de resposta bruto da conversa,
+igual o bug já corrigido em `atendente_performance()` mais cedo, só que
+essa função irmã nunca recebeu a mesma correção. Confirmado com dado
+real: 2 de 11 chamados do Eduardo tinham resposta de fato da Ana/Vittor,
+inflando a média (9,7min vs 8,4min real). Corrigido: agora só conta
+`tempo_primeira_resposta_seg` quando
+`nome_canonico_por_operator_id(primeiro_atendente_humano_crisp_id,
+primeiro_atendente_humano)` bate com o nome do usuário logado — mesmo
+critério do Overview. Também trocado o filtro de "minhas conversas"
+(que usava `ilike` solto comparando `users.nome` com `operator_nome`
+cru) pelo mesmo `nome_canonico_por_operator_id()` canônico usado em toda
+parte, em vez de substring frágil.
+
+Varredura no banco por padrões parecidos (feita na mesma auditoria):
+- Nenhuma outra função ainda tinha o bug de detecção de bot por
+  substring solto (`ilike '%IA%'`/`'%bot%'`) — as 4 corrigidas mais cedo
+  continuam sendo as únicas com esse padrão, já usando o ancorado.
+- `atendimentos_com_metricas()` já filtra atendente por
+  `nome_canonico_por_operator_id()` (canônico) — sem problema.
+- `horario_por_nome(p_nome)` é **código morto**: usa o mesmo padrão de
+  `ilike` solto pra achar usuário por nome, mas nada mais no banco chama
+  essa função desde o fix arquitetural de 2026-08-16 (documentado acima
+  nesta seção) — inofensiva, mas candidata a limpeza futura.
+- CSAT (`atendente_aliases`, chaveado por e-mail via
+  `normalizar_email_atendente`/`normalizar_nome_atendente`) usa um
+  mecanismo de identidade **intencionalmente separado** de
+  `operator_id_aliases`/`nome_canonico_por_operator_id` (chaveado por
+  `operator_crisp_id`, usado em tudo que vem de `crisp_conversations`) —
+  isso é a decisão arquitetural já documentada (seção 21: CSAT e
+  conversas são fontes de verdade diferentes, ligadas por e-mail, nunca
+  por id). Não é bug, mas vale lembrar que são dois sistemas de
+  reconciliação de nome paralelos — uma mudança de alias num não reflete
+  automaticamente no outro.
+
+**Feature nova em 2026-08-18 — pop-up de detalhe em dado truncado (CSAT):**
+por pedido do usuário ("onde os dados não ficam completos como o
+comentário nessa aba"), criado `src/components/CsatDetalheDialog.tsx`
+(compartilhado): mostra todos os campos de uma avaliação de CSAT sem
+cortar (cliente, telefone, e-mail, tags, comentário inteiro, link do
+chamado), acionado clicando na linha da tabela — aplicado em CSAT →
+Planilha e em Meu Painel (histórico pessoal de avaliações), único lugar
+onde o padrão fazia sentido depois de varrer a plataforma por
+`truncate`/`title=` cortado. Nesse mesmo lote, o gráfico "CSAT por
+colaborador" (Csat.tsx) ganhou quantidade de avaliações e média por
+atendente, e o helper `nomesCurtosDisambiguados()` (desambigua nomes
+duplicados tipo as duas "Ana" com inicial do sobrenome) saiu de dentro de
+`Performance.tsx` pra `src/lib/utils.ts`, compartilhado entre Overview e
+CSAT.
+
+**Fix aplicado em 2026-08-18 (mais tarde) — campos vazios do CSAT
+apareciam em branco em vez de "—":** usuário notou "E-mail do cliente" e
+"Telefone" sem o placeholder padrão no popup novo. Causa: o n8n grava
+string vazia (`''`) em campos sem dado, não `null` — e o componente usava
+`?? "—"` (só cobre `null`/`undefined`, não string vazia). Confirmado no
+banco: 2 registros com `email = ''`, 13 com `telefone = ''`, 15 com
+`numero_whatsapp = ''`, de 20 totais — não é exclusivo de um registro.
+Corrigido trocando `??` por `||` nesses dois campos em
+`CsatDetalheDialog.tsx`. Os campos "Tempo até 1ª resposta"/"Tempo até
+encerramento" continuam mostrando "—" corretamente — isso não é bug (ver
+seção 7/8: `tempo_primeira_resposta_seg`/`tempo_encerramento_seg` nunca
+são preenchidos pelo n8n pro CSAT, e `crisp_id`/`conversation_id` — o
+vínculo que permitiria buscar o tempo em `crisp_conversations` — está
+100% nulo). Investigado se dava pra recuperar por aproximação (atendente +
+horário próximo): não há nenhuma `crisp_conversations` correspondente
+nem no dia inteiro pro caso investigado, e mesmo quando houvesse seria
+arriscado — `csat_results.data_hora` é o momento em que o **cliente
+respondeu a pesquisa**, não o do atendimento, podem ser horas de
+diferença.
+
+**Achado na mesma auditoria — `crisp_conversations.operator_email` está
+sempre `NULL` no dado atual (268/268 linhas), apesar de seções deste
+documento (7, 8, 10) descreverem esse campo como "vínculo confiável" —
+essa descrição ficou desatualizada** desde que a reconciliação migrou pra
+`operator_crisp_id`/`operator_id_aliases` (fix de 2026-08-17, ver acima
+nesta seção). Nenhuma função SQL em uso depende de `operator_email` hoje
+(`atendente_performance`/`minhas_conversas_metricas` já usam
+`nome_canonico_por_operator_id()`); o único lugar do frontend que ainda
+filtra por ele é `fetchConversasFiltered()`
+(`src/services/api.ts:1087`, `query.eq("operator_email", atendenteEmail)`)
+— mas essa função **não é chamada por nenhuma página** (código morto,
+mesma categoria de `horario_por_nome`), então o filtro quebrado nunca
+chegou a afetar usuário real. Continua valendo por e-mail apenas pro CSAT
+(`csat_results.email_atendente`, mecanismo separado, confirmado populado).
+Não corrigido agora por não ter impacto ativo; candidato à mesma limpeza
+futura de `horario_por_nome`.
+
+**Fix aplicado em 2026-08-18 (mais tarde) — TFR do Meu Painel unificado
+com o de Overview:** usuário questionou por que "tempo de primeira
+resposta" deveria variar por tela ("o tempo de primeira resposta sempre
+vai ser padrão") depois da auditoria acima — no dado real do período
+01/08–18/08, Overview mostrava 16,7min pro Eduardo (base: 15 conversas
+onde ele foi quem respondeu primeiro, não importa quem ficou com a
+conversa depois) enquanto Meu Painel mostrava 20,9min (base: 11
+conversas, a interseção entre "está comigo agora" e "fui eu quem
+respondeu"). As duas contas estavam corretas pro que cada uma calculava,
+mas representavam populações diferentes sob o mesmo nome de métrica.
+Decisão: TFR passa a ser sempre o critério de Overview (quem de fato deu
+a 1ª resposta, independente de posse atual) em toda a plataforma;
+"Total de chamados"/"Tempo de resolução" continuam baseados na carteira
+atual (mesmo critério das colunas irmãs em `atendente_performance`).
+`minhas_conversas_metricas()` foi reescrita: em vez de filtrar a base só
+por "conversa está comigo agora", passou a incluir também conversas onde
+fui eu quem respondeu primeiro mas que já foram repassadas — cada linha
+ganhou uma flag `minha_carteira` (true = posse atual) pro frontend separar
+o que conta pra "Total de chamados"/"Tempo de resolução" (`filter(c =>
+c.minha_carteira)`) do que conta pra "Tempo de primeira resposta" (lista
+inteira, sem esse filtro). Validado: Meu Painel do Eduardo passou a
+mostrar 16min 43s (bate com Overview) mantendo "Total de chamados: 13"
+intocado.
 
 ## 11. Principais componentes reutilizáveis
 
@@ -945,7 +1155,7 @@ ver seção 6 para a lógica de seções por permissão),
 | Home | `/` | Todo autenticado |
 | Meu Painel | `/meu-painel` | Todo autenticado |
 | Missões | `/missoes` | Todo autenticado (gestão completa é admin-only) |
-| Analytics | `/analytics` | Todo autenticado (ranking/destaque exige permissão `analytics`* ou admin) |
+| Analytics | `/analytics` | Todo autenticado — painel leve (indicadores básicos, evolução, distribuição por canal/status/tópico, ranking exige permissão `analytics`* ou admin) |
 | Reunião de Resultados | `/reuniao-resultados` | Todo autenticado |
 | Cursos | `/cursos` | Todo autenticado |
 | Documentação | `/documentacao` | Todo autenticado |
@@ -957,7 +1167,7 @@ ver seção 6 para a lógica de seções por permissão),
 | CSAT | `/csat` | Permissão granular `csat` ou admin |
 | Reclame Aqui | `/reclame-aqui` | Permissão granular `reclame_aqui` ou admin |
 | NPS | `/nps` | Permissão granular `nps` ou admin |
-| Performance | `/performance` | Admin-only estrito (inclui a aba "Atendimentos", que era uma página própria `/atendimentos` até ser incorporada aqui) |
+| Overview (ex-Performance) | `/performance` | Admin-only estrito — página principal pro admin bater o olho no time inteiro; aba "Dashboard" (ex-"Ranking") concentra CSAT boas/neutras/ruins, ranking de atendentes, Velocidade (TFR/TTR com percentis), Backlog, Relógios (posse/espera), QA (placeholder) e Motivo de contato; aba "Atendimentos" é só a lista crua de chamados (era uma página própria `/atendimentos` até ser incorporada aqui) |
 | Em Risco | `/em-risco` | Admin-only estrito — chamados abertos ordenáveis por tempo em aberto/TFR, com filtros de atendente/status/canal e exportação CSV |
 | Administração (Usuários, Perfis, Permissões, Escalas, Aliases de Atendente, Módulos, Cursos, Documentação, Atualizações, Outros Links) | `/admin/*` | Admin-only estrito |
 

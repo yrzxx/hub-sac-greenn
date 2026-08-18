@@ -16,7 +16,7 @@ export function corPorFaixa(value: number, alto = 80, medio = 50) {
 
 interface BarChartProps {
   data: BarChartDatum[];
-  getColorClass?: (value: number) => string;
+  getColorClass?: (value: number, index: number) => string;
   height?: number;
   className?: string;
 }
@@ -33,7 +33,7 @@ export function BarChart({ data, getColorClass = corPorFaixa, height = 160, clas
           </span>
           <div className="flex w-full flex-1 flex-col justify-end">
             <div
-              className={cn("w-full rounded-t-md transition-[height] duration-300", getColorClass(d.value))}
+              className={cn("w-full rounded-t-md transition-[height] duration-300", getColorClass(d.value, i))}
               style={{ height: `${Math.max((Math.abs(d.value) / max) * 100, 4)}%` }}
             />
           </div>

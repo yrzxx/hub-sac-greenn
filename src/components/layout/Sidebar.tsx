@@ -144,7 +144,7 @@ export function Sidebar() {
         {isAdmin && (
           <>
             <SectionLabel collapsed={collapsed}>Área de Administradores</SectionLabel>
-            <NavItem to="/performance" label="Performance" icon={TrendingUp} collapsed={collapsed} />
+            <NavItem to="/performance" label="Overview" icon={TrendingUp} collapsed={collapsed} />
             <NavItem to="/em-risco" label="Em Risco" icon={AlertOctagon} collapsed={collapsed} />
             <NavItem to="/admin" label="Configurações da plataforma" icon={Settings} collapsed={collapsed} highlight />
           </>

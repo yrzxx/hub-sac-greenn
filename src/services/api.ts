@@ -57,6 +57,12 @@ export async function upsertUser(user: Partial<DbUser> & { id?: string }) {
   return data as DbUser;
 }
 
+export async function updateOwnProfile(id: string, dados: { nome: string; cargo: string; equipe: string }) {
+  const { data, error } = await client().from("users").update(dados).eq("id", id).select().single();
+  if (error) throw error;
+  return data as DbUser;
+}
+
 export async function deleteUser(id: string) {
   const { error } = await client().from("users").delete().eq("id", id);
   if (error) throw error;
@@ -612,6 +618,70 @@ export async function fetchRelogioEsperaCliente(inicio: Date, fim: Date, canal?:
   });
   if (error) throw error;
   return (data?.[0] ?? null) as RelogioEsperaCliente | null;
+}
+
+export interface MotivoContatoResumo {
+  topico: string;
+  chamados: number;
+  tfr_media_seg: number | null;
+  ttr_media_seg: number | null;
+}
+
+export async function fetchMotivoContatoResumo(inicio: Date, fim: Date, canal?: string): Promise<MotivoContatoResumo[]> {
+  const { data, error } = await client().rpc("motivo_contato_resumo", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as MotivoContatoResumo[];
+}
+
+export interface CsatDistribuicao {
+  boas: number;
+  neutras: number;
+  ruins: number;
+  total: number;
+}
+
+export async function fetchCsatDistribuicao(inicio: Date, fim: Date, canal?: string): Promise<CsatDistribuicao | null> {
+  const { data, error } = await client().rpc("csat_distribuicao_notas", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as CsatDistribuicao | null;
+}
+
+export interface TempoRespostaBot {
+  amostras: number;
+  tempo_medio_seg: number | null;
+}
+
+export async function fetchTempoRespostaBot(inicio: Date, fim: Date, canal?: string): Promise<TempoRespostaBot | null> {
+  const { data, error } = await client().rpc("tempo_resposta_bot", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as TempoRespostaBot | null;
+}
+
+export interface ContagemPeriodo {
+  total_chamados: number;
+  total_mensagens: number;
+}
+
+export async function fetchContagemPeriodo(inicio: Date, fim: Date, canal?: string): Promise<ContagemPeriodo | null> {
+  const { data, error } = await client().rpc("contagem_periodo", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as ContagemPeriodo | null;
 }
 
 export interface BacklogFaixa {
@@ -1446,6 +1516,7 @@ export interface AtendimentoComMetricas {
   resolved_at: string | null;
   tempo_primeira_resposta_seg: number | null;
   tempo_resolucao_seg: number | null;
+  tempo_primeira_resposta_geral_seg: number | null;
   invalido_resposta_antes_inicio: boolean;
   invalido_sem_resposta_humana: boolean;
   invalido_tempo_negativo: boolean;
@@ -1499,6 +1570,11 @@ export interface MinhaConversaMetrica {
   tempo_primeira_resposta_seg: number | null;
   tempo_resolucao_seg: number | null;
   status: string | null;
+  // true quando a conversa está atualmente com o usuário (usar pra "Total de
+  // chamados"/"Tempo de resolução"); tempo_primeira_resposta_seg é preenchido
+  // sempre que o usuário respondeu primeiro, mesmo em linhas com minha_carteira
+  // false (conversa repassada depois) — mesmo critério do ranking em Overview.
+  minha_carteira: boolean;
 }
 
 export async function fetchMinhasConversasMetricas(inicio: Date, fim: Date): Promise<MinhaConversaMetrica[]> {

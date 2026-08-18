@@ -34,6 +34,7 @@ interface AuthContextValue {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -98,6 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!supabase) return;
         await supabase.auth.signOut();
         setUser(null);
+      },
+      refreshUser: async () => {
+        if (!supabase) return;
+        const { data } = await supabase.auth.getSession();
+        await loadProfile(data.session);
       },
     }),
     [user, loading, error]

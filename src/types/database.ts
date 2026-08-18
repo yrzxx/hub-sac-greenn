@@ -112,15 +112,28 @@ export interface DbCsatResult {
   atendente: string;
   email_atendente: string | null;
   cliente: string | null;
+  telefone: string | null;
   email: string | null;
+  numero_whatsapp: string | null;
   nota: number | null;
   comentario: string | null;
   canal: string | null;
   topico: string | null;
   categoria_cliente: "Consumidor" | "Produtor" | "Não identificado" | null;
+  tags_cliente: string | null;
+  estado: string | null;
+  link_chamado: string | null;
   tempo_primeira_resposta_seg: number | null;
   tempo_encerramento_seg: number | null;
+  tempo_primeira_resposta_minutos: number | null;
+  primeira_mensagem_cliente: string | null;
+  primeira_resposta_humana: string | null;
+  primeira_resposta_origem: string | null;
+  teve_interacao_humana: boolean | null;
   classificacao_csat: "Promotor" | "Neutro" | "Detrator" | null;
+  crisp_id: string | null;
+  conversation_id: string | null;
+  resolved_operator_crisp_id: string | null;
   created_at: string;
   users?: DbUser | null;
 }

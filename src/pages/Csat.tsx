@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Download, ArrowUpDown, Star, FileDown, ArrowUpRight, ArrowDownRight, SlidersHorizontal, Check } from "lucide-react";
-import { cn, formatDelta } from "@/lib/utils";
+import { cn, formatDelta, nomesCurtosDisambiguados } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,8 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { fetchDistinctOperadores, fetchCsatFiltered, fetchCsatForDashboard, fetchAtendenteAliases, fetchDashboardAtendimentoSummary } from "@/services/api";
 import type { CsatFilters } from "@/services/api";
+import type { DbCsatResult } from "@/types/database";
+import { CsatDetalheDialog } from "@/components/CsatDetalheDialog";
 import { exportCsatToCsv } from "@/lib/exportCsv";
 import { exportCsatDashboardToPdf } from "@/lib/exportPdf";
 import {
@@ -173,6 +175,7 @@ export default function Csat() {
   const [sortBy, setSortBy] = useState("data_hora");
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
+  const [detalhe, setDetalhe] = useState<DbCsatResult | null>(null);
 
   const { inicio, fim } = useMemo(() => resolvePeriodo(preset, personalizado), [preset, personalizado]);
   const { inicio: inicioAnterior, fim: fimAnterior } = useMemo(
@@ -466,7 +469,11 @@ export default function Csat() {
                   </thead>
                   <tbody>
                     {planilha.rows.map((r) => (
-                      <tr key={r.id} className="border-t border-sand-line">
+                      <tr
+                        key={r.id}
+                        onClick={() => setDetalhe(r)}
+                        className="cursor-pointer border-t border-sand-line transition-all hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
+                      >
                         <td className="px-4 py-3 text-ink/70">{new Date(r.data_hora).toLocaleString("pt-BR")}</td>
                         <td className="px-4 py-3 text-ink">{r.atendente}</td>
                         <td className="px-4 py-3 text-ink/70">
@@ -542,14 +549,19 @@ export default function Csat() {
           <Card className="p-5">
             <h2 className="mb-3 font-display text-sm font-semibold text-ink">CSAT por colaborador</h2>
             <BarChart
-              data={[...porColaborador]
-                .sort((a, b) => (b.percentual ?? 0) - (a.percentual ?? 0))
-                .map((c) => ({
-                  label: c.atendente?.split(" ")[0] ?? "—",
+              data={(() => {
+                const ordenado = [...porColaborador].sort((a, b) => (b.percentual ?? 0) - (a.percentual ?? 0));
+                const rotulos = nomesCurtosDisambiguados(ordenado.map((c) => c.atendente ?? "—"));
+                return ordenado.map((c, i) => ({
+                  label: `${rotulos[i]} · ${c.total} aval.`,
                   value: c.percentual ?? 0,
-                  displayValue: c.percentual !== null ? `${c.percentual.toFixed(0)}%` : "—",
-                }))}
+                  displayValue: c.percentual !== null
+                    ? `${c.percentual.toFixed(0)}% · méd ${c.media?.toFixed(1) ?? "—"}`
+                    : "—",
+                }));
+              })()}
               getColorClass={corPorFaixa}
+              height={190}
             />
           </Card>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -617,6 +629,8 @@ export default function Csat() {
           </div>
         </>
       )}
+
+      {detalhe && <CsatDetalheDialog registro={detalhe} onClose={() => setDetalhe(null)} />}
     </div>
   );
 }

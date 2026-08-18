@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Clock } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { LogOut, Clock, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { fetchMyHorario, updateMyHorario } from "@/services/api";
+import { fetchMyHorario, updateMyHorario, updateOwnProfile } from "@/services/api";
+
+const perfilSchema = z.object({
+  nome: z.string().min(1, "Nome é obrigatório"),
+  cargo: z.string(),
+  equipe: z.string(),
+});
+type PerfilForm = z.infer<typeof perfilSchema>;
 
 const DEFAULT_HORARIO = {
   horario_entrada: "08:00",
@@ -15,12 +25,44 @@ const DEFAULT_HORARIO = {
 };
 
 export default function Perfil() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [notificacoes, setNotificacoes] = useState(true);
   const [horario, setHorario] = useState(DEFAULT_HORARIO);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const [editandoPerfil, setEditandoPerfil] = useState(false);
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
+  const [erroPerfil, setErroPerfil] = useState<string | null>(null);
+  const {
+    register: registerPerfil,
+    handleSubmit: handleSubmitPerfil,
+    reset: resetPerfil,
+    formState: { errors: errosPerfil },
+  } = useForm<PerfilForm>({ resolver: zodResolver(perfilSchema) });
+
+  function abrirEdicaoPerfil() {
+    if (!user) return;
+    resetPerfil({ nome: user.nome, cargo: user.cargo, equipe: user.equipe });
+    setErroPerfil(null);
+    setEditandoPerfil(true);
+  }
+
+  async function salvarPerfil(dados: PerfilForm) {
+    if (!user) return;
+    setSalvandoPerfil(true);
+    setErroPerfil(null);
+    try {
+      await updateOwnProfile(user.id, dados);
+      await refreshUser();
+      setEditandoPerfil(false);
+    } catch (err) {
+      setErroPerfil(err instanceof Error ? err.message : "Não foi possível salvar o perfil.");
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  }
 
   const { data: horarioAtual } = useQuery({
     queryKey: ["meu-horario", user?.id],
@@ -65,26 +107,71 @@ export default function Perfil() {
       </div>
 
       <Card>
-        <CardContent className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-forest-50 text-xl font-display font-semibold text-forest-700">
-            {user.nome
-              .split(" ")
-              .slice(0, 2)
-              .map((n) => n[0])
-              .join("")}
-          </div>
-          <div>
-            <p className="font-display text-base font-semibold text-ink">
-              {user.nome}
-            </p>
-            <p className="text-sm text-ink/60">{user.email}</p>
-            <p className="text-sm text-ink/60">
-              {user.cargo} · {user.equipe}
-            </p>
-          </div>
-          <Badge tone={user.perfil === "administrador" ? "brand" : "neutral"} className="ml-auto">
-            {user.perfil === "administrador" ? "Admin" : "Colaborador"}
-          </Badge>
+        <CardContent>
+          {editandoPerfil ? (
+            <form onSubmit={handleSubmitPerfil(salvarPerfil)} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink/70">Nome</label>
+                <input
+                  {...registerPerfil("nome")}
+                  className="w-full rounded-lg border border-sand-line px-3 py-2 text-sm outline-none focus:border-forest-500"
+                />
+                {errosPerfil.nome && <p className="mt-1 text-xs text-rust-500">{errosPerfil.nome.message}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink/70">Cargo</label>
+                  <input
+                    {...registerPerfil("cargo")}
+                    className="w-full rounded-lg border border-sand-line px-3 py-2 text-sm outline-none focus:border-forest-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink/70">Equipe</label>
+                  <input
+                    {...registerPerfil("equipe")}
+                    className="w-full rounded-lg border border-sand-line px-3 py-2 text-sm outline-none focus:border-forest-500"
+                  />
+                </div>
+              </div>
+              {erroPerfil && <p className="text-sm text-rust-500">{erroPerfil}</p>}
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={salvandoPerfil}>
+                  {salvandoPerfil ? "Salvando..." : "Salvar"}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setEditandoPerfil(false)} disabled={salvandoPerfil}>
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-forest-50 text-xl font-display font-semibold text-forest-700">
+                {user.nome
+                  .split(" ")
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join("")}
+              </div>
+              <div>
+                <p className="font-display text-base font-semibold text-ink">
+                  {user.nome}
+                </p>
+                <p className="text-sm text-ink/60">{user.email}</p>
+                <p className="text-sm text-ink/60">
+                  {user.cargo} · {user.equipe}
+                </p>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <Badge tone={user.perfil === "administrador" ? "brand" : "neutral"}>
+                  {user.perfil === "administrador" ? "Admin" : "Colaborador"}
+                </Badge>
+                <Button variant="secondary" size="sm" onClick={abrirEdicaoPerfil}>
+                  <Pencil size={13} /> Editar
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
