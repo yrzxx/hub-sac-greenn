@@ -973,7 +973,6 @@ export interface AtendentePerformanceRow {
   operator_email: string | null;
   total_atendimentos: number;
   tfr_medio: number | null;
-  tfr_geral_medio: number | null;
   tempo_resolucao_medio: number | null;
   csat_medio: number | null;
   total_avaliacoes: number;

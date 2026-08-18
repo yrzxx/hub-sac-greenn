@@ -12,6 +12,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeConversas } from "@/hooks/useRealtimeConversas";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import {
   fetchAtendentePerformance,
   fetchDistinctCanais,
@@ -67,22 +68,22 @@ function corBacklogFaixa(faixa: string) {
   return "text-rust-500";
 }
 
-type RankingCampo = "total_atendimentos" | "tfr_medio" | "tfr_geral_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
+type RankingCampo = "total_atendimentos" | "tfr_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
 
 export default function Performance() {
   useRealtimeConversas();
   const { isAdmin } = useAuth();
   const podeVer = isAdmin;
 
-  const [aba, setAba] = useState<"ranking" | "atendimentos">("ranking");
-  const [preset, setPreset] = useState<PeriodoPreset>("30dias");
-  const [personalizado, setPersonalizado] = useState({ inicio: "", fim: "" });
-  const [canal, setCanal] = useState("");
-  const [status, setStatus] = useState("");
+  const [aba, setAba] = usePersistedState<"ranking" | "atendimentos">("overview:aba", "ranking");
+  const [preset, setPreset] = usePersistedState<PeriodoPreset>("overview:preset", "30dias");
+  const [personalizado, setPersonalizado] = usePersistedState("overview:personalizado", { inicio: "", fim: "" });
+  const [canal, setCanal] = usePersistedState("overview:canal", "");
+  const [status, setStatus] = usePersistedState("overview:status", "");
 
   const [busca, setBusca] = useState("");
-  const [tipoCliente, setTipoCliente] = useState("");
-  const [atendenteNome, setAtendenteNome] = useState("");
+  const [tipoCliente, setTipoCliente] = usePersistedState("overview:tipoCliente", "");
+  const [atendenteNome, setAtendenteNome] = usePersistedState("overview:atendenteNome", "");
   const [page, setPage] = useState(0);
   const [ordenarPor, setOrdenarPor] = useState<OrdenarCampo | undefined>(undefined);
   const [direcao, setDirecao] = useState<"asc" | "desc">("desc");
@@ -159,22 +160,27 @@ export default function Performance() {
     }
   }
 
+  const iaEntry = useMemo(() => ranking?.find((r) => r.operator_nome === "IA Greenn"), [ranking]);
+  const rankingHumano = useMemo(() => ranking?.filter((r) => r.operator_nome !== "IA Greenn"), [ranking]);
+
   const rankingOrdenado = useMemo(() => {
-    if (!ranking || !rankingOrdenarPor) return ranking;
-    const copia = [...ranking];
+    if (!rankingHumano || !rankingOrdenarPor) return rankingHumano;
+    const copia = [...rankingHumano];
     copia.sort((a, b) => {
       const av = a[rankingOrdenarPor] ?? -Infinity;
       const bv = b[rankingOrdenarPor] ?? -Infinity;
       return rankingDirecao === "asc" ? av - bv : bv - av;
     });
     return copia;
-  }, [ranking, rankingOrdenarPor, rankingDirecao]);
+  }, [rankingHumano, rankingOrdenarPor, rankingDirecao]);
 
   const posseMap = useMemo(() => {
     const mapa = new Map<string, { minutos_posse: number; conversas: number }>();
     (posse ?? []).forEach((p) => mapa.set(p.atendente, p));
     return mapa;
   }, [posse]);
+
+  const iaPosse = posseMap.get("IA Greenn");
 
   const filtrosAtendimentos = useMemo(
     () => ({
@@ -248,18 +254,52 @@ export default function Performance() {
 
           {csatDist && csatDist.total > 0 && (
             <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="border-forest-400/30 bg-forest-500/5 p-4">
+              <Card className="border-forest-400/30 bg-forest-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Avaliações boas (4–5)</p>
                 <p className="mt-1 font-display text-kpi-lg font-bold text-forest-600">{csatDist.boas}</p>
               </Card>
-              <Card className="border-amber-400/30 bg-amber-500/5 p-4">
+              <Card className="border-amber-400/30 bg-amber-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Avaliações neutras (3)</p>
                 <p className="mt-1 font-display text-kpi-lg font-bold text-amber-600">{csatDist.neutras}</p>
               </Card>
-              <Card className="border-rust-400/30 bg-rust-500/5 p-4">
+              <Card className="border-rust-400/30 bg-rust-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Avaliações ruins (1–2)</p>
                 <p className="mt-1 font-display text-kpi-lg font-bold text-rust-600">{csatDist.ruins}</p>
               </Card>
+            </div>
+          )}
+
+          {iaEntry && (
+            <div>
+              <h2 className="mb-3 font-display text-sm font-semibold text-ink">Bot (IA Greenn)</h2>
+              <Card className="flex flex-wrap items-center gap-6 border-sky-400/30 bg-sky-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Atendimentos</p>
+                  <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{iaEntry.total_atendimentos}</p>
+                </div>
+                {iaEntry.csat_medio !== null && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink/40">CSAT médio</p>
+                    <p className={cn("mt-1 font-display text-kpi-lg font-bold", corTextoCsat(iaEntry.csat_medio))}>{iaEntry.csat_medio.toFixed(1)}</p>
+                  </div>
+                )}
+                {iaPosse && (
+                  <>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Chamados c/ posse</p>
+                      <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{iaPosse.conversas}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Tempo de posse (total)</p>
+                      <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{formatDuration(iaPosse.minutos_posse * 60)}</p>
+                    </div>
+                  </>
+                )}
+              </Card>
+              <p className="mt-2 text-xs text-ink/40">
+                Separado do ranking humano — TFR e tempo de resolução não fazem sentido pro bot (ele não "responde
+                como humano" nem "resolve" no sentido usado ali).
+              </p>
             </div>
           )}
 
@@ -280,15 +320,14 @@ export default function Performance() {
           ) : (
             <Card className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                <thead className="bg-sand-bg text-center text-xs uppercase tracking-wide text-ink/50">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Atendente</th>
-                    <SortableHeader field="total_atendimentos" label="Total de atendimentos" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
-                    <SortableHeader field="tfr_medio" label="TFR médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
-                    <SortableHeader field="tfr_geral_medio" label="Resposta do bot" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
-                    <SortableHeader field="tempo_resolucao_medio" label="Tempo médio de resolução" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
-                    <SortableHeader field="csat_medio" label="CSAT médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
-                    <SortableHeader field="total_avaliacoes" label="Avaliações" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <th className="px-4 py-3 text-left font-medium">Atendente</th>
+                    <SortableHeader align="center" field="total_atendimentos" label="Total de atendimentos" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader align="center" field="tfr_medio" label="TFR médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader align="center" field="tempo_resolucao_medio" label="Tempo médio de resolução" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader align="center" field="csat_medio" label="CSAT médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader align="center" field="total_avaliacoes" label="Avaliações" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <th className="px-4 py-3 font-medium">Tempo de posse</th>
                     <th className="px-4 py-3 font-medium">Chamados c/ posse</th>
                     <th className="px-4 py-3 font-medium">Posse média</th>
@@ -302,14 +341,13 @@ export default function Performance() {
                         key={r.operator_email ?? r.operator_nome}
                         onClick={p ? () => setPosseDetalhe(r.operator_nome) : undefined}
                         className={cn(
-                          "border-t border-sand-line transition-all",
+                          "border-t border-sand-line text-center transition-all",
                           p && "relative cursor-pointer hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
                         )}
                       >
-                        <td className="px-4 py-3 font-medium text-ink">{r.operator_nome}</td>
+                        <td className="px-4 py-3 text-left font-medium text-ink">{r.operator_nome}</td>
                         <td className="px-4 py-3 text-ink/70">{r.total_atendimentos}</td>
                         <td className="px-4 py-3 text-ink/70">{formatMin(r.tfr_medio)}</td>
-                        <td className="px-4 py-3 text-ink/60">{formatMin(r.tfr_geral_medio)}</td>
                         <td className="px-4 py-3 text-ink/70">{formatMin(r.tempo_resolucao_medio)}</td>
                         <td className={cn("px-4 py-3 font-semibold", corTextoCsat(r.csat_medio))}>{r.csat_medio?.toFixed(1) ?? "—"}</td>
                         <td className="px-4 py-3 text-ink/70">{r.total_avaliacoes}</td>
@@ -400,8 +438,7 @@ export default function Performance() {
                 </button>
               </div>
               <div className="mt-3 space-y-3 text-sm text-ink/70">
-                <p><span className="font-semibold text-ink">TFR</span> — tempo até a 1ª resposta humana (do início do chamado até um atendente responder; bot não conta).</p>
-                <p><span className="font-semibold text-ink">Resposta do bot</span> — tempo até a 1ª resposta de qualquer tipo (inclui a automática do bot). É uma métrica separada do TFR, não uma variação dele — TFR continua sendo só humano.</p>
+                <p><span className="font-semibold text-ink">TFR</span> — tempo até a 1ª resposta humana. No Ranking, atribuído a quem de fato respondeu primeiro (não necessariamente quem é o atendente atual do chamado, se ele trocou de mão depois).</p>
                 <p><span className="font-semibold text-ink">TTR</span> — tempo até a resolução (do início do chamado até ele ser marcado como resolvido).</p>
                 <p><span className="font-semibold text-ink">Média</span> — soma de todos os tempos dividida pela quantidade de chamados. Pode ser puxada por poucos casos muito lentos (outliers).</p>
                 <p><span className="font-semibold text-ink">P50 (mediana)</span> — metade dos chamados foi respondida/resolvida em até esse tempo. É o "caso típico", menos sensível a outliers que a média.</p>
@@ -424,7 +461,7 @@ export default function Performance() {
                   const total = backlog.find((b) => b.faixa === faixa)?.total ?? 0;
                   const critico = faixa === "+7 dias";
                   return (
-                    <Card key={faixa} className={cn("p-4", critico && total > 0 && "border-rust-400/40 bg-rust-500/5")}>
+                    <Card key={faixa} className={cn("p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover", critico && total > 0 && "border-rust-400/40 bg-rust-500/5")}>
                       <p className="text-xs font-medium uppercase tracking-wide text-ink/40">{faixa}</p>
                       <p className={cn("mt-1 font-display text-kpi-lg font-bold", total > 0 ? corBacklogFaixa(faixa) : "text-ink")}>{total}</p>
                     </Card>
@@ -455,7 +492,7 @@ export default function Performance() {
                   ) : (
                     <>
                       <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration((esperaCliente.minutos_espera_medio ?? 0) * 60)}</p>
-                      <p className="mt-1 text-[11px] text-ink/40">{esperaCliente.amostras} janelas de espera</p>
+                      <p className="mt-1 text-[11px] text-ink/40">{esperaCliente.amostras} janelas de espera até resposta humana (bot não conta)</p>
                     </>
                   )}
                 </div>
@@ -467,14 +504,16 @@ export default function Performance() {
                 </div>
               </div>
 
-              <p className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-ink/40">Posse por atendente (chamados resolvidos no período)</p>
+              <p className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-ink/40">Posse por atendente humano (chamados resolvidos no período)</p>
               {loadingPosse ? (
                 <p className="text-sm text-ink/50">Carregando...</p>
-              ) : !posse || posse.length === 0 ? (
+              ) : !posse || posse.filter((p) => p.atendente !== "IA Greenn").length === 0 ? (
                 <p className="text-sm text-ink/50">Sem chamados resolvidos no período pra medir posse.</p>
               ) : (
                 <BarChart
-                  data={posse.map((p) => ({ label: p.atendente, value: p.minutos_posse / 60, displayValue: `${(p.minutos_posse / 60).toFixed(1)}h` }))}
+                  data={posse
+                    .filter((p) => p.atendente !== "IA Greenn")
+                    .map((p) => ({ label: p.atendente, value: p.minutos_posse / 60, displayValue: `${(p.minutos_posse / 60).toFixed(1)}h` }))}
                   getColorClass={() => "bg-sky-500"}
                   height={120}
                 />
@@ -482,8 +521,9 @@ export default function Performance() {
               <p className="mt-3 text-xs text-ink/40">
                 Posse = tempo entre a 1ª mensagem de um atendente num chamado e a entrada do próximo atendente (ou a
                 resolução, se ninguém mais entrar) — cada trecho conta só pra quem estava "com a bola" naquele momento,
-                não o TTR inteiro pra todo mundo que passou pelo chamado. Detalhamento por atendente está na tabela de
-                Ranking, no topo da página.
+                não o TTR inteiro pra todo mundo que passou pelo chamado. Bot (IA Greenn) fica de fora daqui — vem
+                separado no card acima do Ranking. Detalhamento por atendente está na tabela de Ranking, no topo da
+                página.
               </p>
             </Card>
           </div>
@@ -504,20 +544,20 @@ export default function Performance() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                      <thead className="bg-sand-bg text-center text-xs uppercase tracking-wide text-ink/50">
                         <tr>
-                          <th className="px-3 py-2 font-medium">Cliente</th>
+                          <th className="px-3 py-2 text-left font-medium">Cliente</th>
                           <th className="px-3 py-2 font-medium">Início</th>
                           <th className="px-3 py-2 font-medium">1ª resposta</th>
                           <th className="px-3 py-2 font-medium">Resolução</th>
                           <th className="px-3 py-2 font-medium">Status</th>
-                          <th className="px-3 py-2 font-medium text-right">Ação</th>
+                          <th className="px-3 py-2 font-medium">Ação</th>
                         </tr>
                       </thead>
                       <tbody>
                         {posseDetalheAtendimentos.rows.map((c) => (
-                          <tr key={c.id} className="border-t border-sand-line align-top">
-                            <td className="px-3 py-2">
+                          <tr key={c.id} className="border-t border-sand-line text-center align-top">
+                            <td className="px-3 py-2 text-left">
                               <p className="font-medium text-ink">{c.cliente_nome ?? "—"}</p>
                               <p className="text-xs text-ink/50">{c.cliente_email}</p>
                             </td>
@@ -539,7 +579,7 @@ export default function Performance() {
                                 {c.status ? statusLabel[c.status] ?? c.status : "—"}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-3 py-2">
                               {c.link_chamado ? (
                                 <a href={c.link_chamado} target="_blank" rel="noreferrer">
                                   <Button variant="secondary" size="sm">
@@ -583,9 +623,9 @@ export default function Performance() {
               <>
                 <Card className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                    <thead className="bg-sand-bg text-center text-xs uppercase tracking-wide text-ink/50">
                       <tr>
-                        <th className="px-4 py-3 font-medium">Tópico</th>
+                        <th className="px-4 py-3 text-left font-medium">Tópico</th>
                         <th className="px-4 py-3 font-medium">Chamados</th>
                         <th className="px-4 py-3 font-medium">TFR médio</th>
                         <th className="px-4 py-3 font-medium">TTR médio</th>
@@ -593,8 +633,8 @@ export default function Performance() {
                     </thead>
                     <tbody>
                       {(mostrarTodosMotivos ? motivos : motivos.slice(0, 10)).map((m) => (
-                        <tr key={m.topico} className="border-t border-sand-line">
-                          <td className="px-4 py-3 font-medium text-ink">{m.topico}</td>
+                        <tr key={m.topico} className="border-t border-sand-line text-center">
+                          <td className="px-4 py-3 text-left font-medium text-ink">{m.topico}</td>
                           <td className="px-4 py-3 text-ink/70">{m.chamados}</td>
                           <td className="px-4 py-3 text-ink/70">{formatDuration(m.tfr_media_seg)}</td>
                           <td className="px-4 py-3 text-ink/70">{formatDuration(m.ttr_media_seg)}</td>
@@ -653,24 +693,24 @@ export default function Performance() {
             <>
               <Card>
                 <table className="w-full table-fixed text-sm">
-                  <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                  <thead className="bg-sand-bg text-center text-xs uppercase tracking-wide text-ink/50">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Cliente</th>
+                      <th className="px-4 py-3 text-left font-medium">Cliente</th>
                       <th className="px-4 py-3 font-medium">Atendente</th>
-                      <SortableHeader field="tempo_aberto" label="Início" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} />
+                      <SortableHeader align="center" field="tempo_aberto" label="Início" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} />
                       <th className="px-4 py-3 font-medium">1ª resposta humana</th>
-                      <SortableHeader field="tfr" label="Tempo até 1ª resposta" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} />
-                      <SortableHeader field="tempo_resolucao" label="Resolução" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} className="hidden lg:table-cell" />
+                      <SortableHeader align="center" field="tfr" label="Tempo até 1ª resposta" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} />
+                      <SortableHeader align="center" field="tempo_resolucao" label="Resolução" ordenarPor={ordenarPor} direcao={direcao} onSort={ordenarPorColuna} className="hidden lg:table-cell" />
                       <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium text-right">Ação</th>
+                      <th className="px-4 py-3 font-medium">Ação</th>
                     </tr>
                   </thead>
                   <tbody>
                     {atendimentos.rows.map((c) => {
                       const invalido = c.invalido_resposta_antes_inicio || c.invalido_tempo_negativo;
                       return (
-                        <tr key={c.id} className={"border-t border-sand-line align-top " + (invalido ? "bg-rust-500/5" : "")}>
-                          <td className="truncate px-4 py-3">
+                        <tr key={c.id} className={"border-t border-sand-line text-center align-top " + (invalido ? "bg-rust-500/5" : "")}>
+                          <td className="truncate px-4 py-3 text-left">
                             <p className="truncate font-medium text-ink">{c.cliente_nome ?? "—"}</p>
                             <p className="truncate text-xs text-ink/50">{c.cliente_email}</p>
                           </td>
@@ -683,7 +723,7 @@ export default function Performance() {
                             {c.invalido_sem_resposta_humana ? (
                               <span className="text-xs text-ink/40">sem resposta humana</span>
                             ) : invalido ? (
-                              <span title="Dado inconsistente: resposta antes do início ou tempo negativo" className="flex items-center gap-1 text-xs text-rust-500">
+                              <span title="Dado inconsistente: resposta antes do início ou tempo negativo" className="inline-flex items-center gap-1 text-xs text-rust-500">
                                 <AlertTriangle size={12} /> inválido
                               </span>
                             ) : (
@@ -696,7 +736,7 @@ export default function Performance() {
                               {c.status ? statusLabel[c.status] ?? c.status : "—"}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3">
                             {c.link_chamado ? (
                               <a href={c.link_chamado} target="_blank" rel="noreferrer">
                                 <Button variant="secondary" size="sm">
