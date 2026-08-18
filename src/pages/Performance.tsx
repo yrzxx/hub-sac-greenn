@@ -67,7 +67,7 @@ function corBacklogFaixa(faixa: string) {
   return "text-rust-500";
 }
 
-type RankingCampo = "total_atendimentos" | "tfr_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
+type RankingCampo = "total_atendimentos" | "tfr_medio" | "tfr_geral_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
 
 export default function Performance() {
   useRealtimeConversas();
@@ -285,6 +285,7 @@ export default function Performance() {
                     <th className="px-4 py-3 font-medium">Atendente</th>
                     <SortableHeader field="total_atendimentos" label="Total de atendimentos" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="tfr_medio" label="TFR médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <SortableHeader field="tfr_geral_medio" label="Resposta do bot" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="tempo_resolucao_medio" label="Tempo médio de resolução" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="csat_medio" label="CSAT médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="total_avaliacoes" label="Avaliações" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
@@ -308,6 +309,7 @@ export default function Performance() {
                         <td className="px-4 py-3 font-medium text-ink">{r.operator_nome}</td>
                         <td className="px-4 py-3 text-ink/70">{r.total_atendimentos}</td>
                         <td className="px-4 py-3 text-ink/70">{formatMin(r.tfr_medio)}</td>
+                        <td className="px-4 py-3 text-ink/60">{formatMin(r.tfr_geral_medio)}</td>
                         <td className="px-4 py-3 text-ink/70">{formatMin(r.tempo_resolucao_medio)}</td>
                         <td className={cn("px-4 py-3 font-semibold", corTextoCsat(r.csat_medio))}>{r.csat_medio?.toFixed(1) ?? "—"}</td>
                         <td className="px-4 py-3 text-ink/70">{r.total_avaliacoes}</td>
@@ -399,6 +401,7 @@ export default function Performance() {
               </div>
               <div className="mt-3 space-y-3 text-sm text-ink/70">
                 <p><span className="font-semibold text-ink">TFR</span> — tempo até a 1ª resposta humana (do início do chamado até um atendente responder; bot não conta).</p>
+                <p><span className="font-semibold text-ink">Resposta do bot</span> — tempo até a 1ª resposta de qualquer tipo (inclui a automática do bot). É uma métrica separada do TFR, não uma variação dele — TFR continua sendo só humano.</p>
                 <p><span className="font-semibold text-ink">TTR</span> — tempo até a resolução (do início do chamado até ele ser marcado como resolvido).</p>
                 <p><span className="font-semibold text-ink">Média</span> — soma de todos os tempos dividida pela quantidade de chamados. Pode ser puxada por poucos casos muito lentos (outliers).</p>
                 <p><span className="font-semibold text-ink">P50 (mediana)</span> — metade dos chamados foi respondida/resolvida em até esse tempo. É o "caso típico", menos sensível a outliers que a média.</p>

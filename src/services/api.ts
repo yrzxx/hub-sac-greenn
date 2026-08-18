@@ -57,6 +57,12 @@ export async function upsertUser(user: Partial<DbUser> & { id?: string }) {
   return data as DbUser;
 }
 
+export async function updateOwnProfile(id: string, dados: { nome: string; cargo: string; equipe: string }) {
+  const { data, error } = await client().from("users").update(dados).eq("id", id).select().single();
+  if (error) throw error;
+  return data as DbUser;
+}
+
 export async function deleteUser(id: string) {
   const { error } = await client().from("users").delete().eq("id", id);
   if (error) throw error;
@@ -967,6 +973,7 @@ export interface AtendentePerformanceRow {
   operator_email: string | null;
   total_atendimentos: number;
   tfr_medio: number | null;
+  tfr_geral_medio: number | null;
   tempo_resolucao_medio: number | null;
   csat_medio: number | null;
   total_avaliacoes: number;
