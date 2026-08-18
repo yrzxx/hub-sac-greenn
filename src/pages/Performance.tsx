@@ -25,6 +25,7 @@ import {
   fetchRelogioEsperaCliente,
   fetchMotivoContatoResumo,
   fetchCsatDistribuicao,
+  fetchTempoRespostaBot,
 } from "@/services/api";
 import { resolvePeriodo, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
@@ -134,6 +135,11 @@ export default function Performance() {
   const { data: csatDist } = useQuery({
     queryKey: ["csat-distribuicao", inicio, fim, canal],
     queryFn: () => fetchCsatDistribuicao(inicio, fim, canal || undefined),
+  });
+
+  const { data: tempoRespostaBot } = useQuery({
+    queryKey: ["tempo-resposta-bot", inicio, fim, canal],
+    queryFn: () => fetchTempoRespostaBot(inicio, fim, canal || undefined),
   });
 
   const { data: posseDetalheAtendimentos, isLoading: loadingPosseDetalhe } = useQuery({
@@ -277,6 +283,13 @@ export default function Performance() {
                   <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Atendimentos</p>
                   <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{iaEntry.total_atendimentos}</p>
                 </div>
+                {tempoRespostaBot && tempoRespostaBot.amostras > 0 && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Tempo médio de 1ª resposta</p>
+                    <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{formatDuration(tempoRespostaBot.tempo_medio_seg)}</p>
+                    <p className="mt-1 text-[11px] text-ink/40">{tempoRespostaBot.amostras} amostras</p>
+                  </div>
+                )}
                 {iaEntry.csat_medio !== null && (
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-ink/40">CSAT médio</p>

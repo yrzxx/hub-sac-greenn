@@ -654,6 +654,21 @@ export async function fetchCsatDistribuicao(inicio: Date, fim: Date, canal?: str
   return (data?.[0] ?? null) as CsatDistribuicao | null;
 }
 
+export interface TempoRespostaBot {
+  amostras: number;
+  tempo_medio_seg: number | null;
+}
+
+export async function fetchTempoRespostaBot(inicio: Date, fim: Date, canal?: string): Promise<TempoRespostaBot | null> {
+  const { data, error } = await client().rpc("tempo_resposta_bot", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as TempoRespostaBot | null;
+}
+
 export interface BacklogFaixa {
   faixa: string;
   total: number;
