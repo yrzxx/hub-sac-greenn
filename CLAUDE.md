@@ -577,6 +577,46 @@ de confirmação humana antes de unificar. `fetchDistinctAtendentesConversas`
 trocou o dedup no cliente por `distinct_atendentes_canonico()` no banco,
 mesma fonte de verdade.
 
+**Pendência descoberta em 2026-08-17 — posse/reabertura deveriam vir de
+evento do Crisp, não de aproximação:** ao reestruturar Analytics (pedido
+de reestruturação de métricas de atendimento), implementei
+`relogio_posse_periodo()` reconstruindo posse por timestamp de
+`crisp_messages` (quem mandou mensagem por último) — funciona, mas é
+aproximação, e por isso ficou restrito a chamados **já resolvidos**
+(senão um chamado pendente sem retomada acumula posse indefinidamente).
+Investigando a API do Crisp (`docs.crisp.chat`), achei que existe o jeito
+certo de fazer isso:
+- Evento RTM `session:set_routing` — disparado quando um operador é
+  atribuído/desatribuído de uma conversa. Payload: `session_id`,
+  `routing_id` (operador atribuído, pode ser null), `previous_routing_id`.
+  **O n8n não escuta esse evento hoje.**
+- Evento RTM `session:set_state` — disparado quando o estado muda
+  (`pending`/`unresolved`/`resolved`). Payload: `session_id`, `state`.
+  Se o n8n comparar o estado novo com o anterior e detectar uma conversa
+  que já foi `resolved` voltando pra `pending`/`unresolved`, isso é a
+  reabertura de verdade — hoje `reopened_count` existe na tabela mas
+  **nunca é incrementado** porque nada escuta essa transição.
+
+Preparei o lado do Supabase pra quando o n8n for ajustado:
+- `operator_routing_history` (`session_id`, `operator_crisp_id`,
+  `previous_operator_crisp_id`, `event_at`) — tabela nova, vazia até o
+  n8n escrever nela. Quando populada, `relogio_posse_periodo()` deve ser
+  reescrita pra ler daqui em vez de reconstruir por mensagem — aí dá pra
+  incluir pendentes com segurança também, porque a janela é fechada por
+  um evento real de desatribuição, não por uma mensagem que talvez nunca
+  chegue.
+- `crisp_conversations.first_resolved_at` — coluna nova, pra manter
+  "primeira resolução" separada de `resolved_at` (resolução mais recente)
+  quando `reopened_count` passar a ser real.
+
+**Mudança de n8n necessária** (fora deste repositório, não implementada
+por mim): assinar `session:set_routing` → `insert` em
+`operator_routing_history`; assinar `session:set_state` → se
+`state = 'resolved'`, atualizar `resolved_at`/`first_resolved_at`
+(coalesce, nunca sobrescrever); se `state` voltar pra
+`pending`/`unresolved` COM `status` anterior já `resolved`, incrementar
+`reopened_count`.
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:
