@@ -758,6 +758,25 @@ P50/P90/P95/SLA/média. Cores: CSAT médio, SLA cumprido e faixas de backlog
 seguem verde/amarelo/vermelho em negrito, mesma lógica de faixa usada no
 CSAT (`corPorFaixa`).
 
+**Achado em 2026-08-18 — existem duas "IA Greenn" diferentes no Crisp,
+não confundir:** ao investigar por que a posse da "IA Greenn" aparecia
+muito alta (150h+), achei que são duas identidades distintas: (1) o
+marcador sintético `operator_crisp_id = "ia_greenn"` (string literal,
+não é UUID) que o n8n atribui em `Code - Send`/`Code - Received` quando
+`data.automated === true` — esse é **excluído de propósito** do cálculo
+de posse (`relogio_posse_periodo`) e da 1ª resposta humana, nunca aparece
+em `operator_routing_history` porque não é um operador real da Crisp; e
+(2) uma **conta de operador de verdade** na Crisp, também chamada "IA
+Greenn" (`operator_crisp_id = "b8b993a0-dd61-487a-b89b-7503756d8eb2"`,
+e-mail `allan@gdigital.com.br`, role `owner`), que recebe roteamento real
+(`session:set_routing`) e portanto conta normalmente na posse — é essa
+conta que gera as 150h+, somando muitas conversas ainda `pending`. Não é
+bug de cálculo, é uma segunda identidade real que só coincide no nome de
+exibição. Pendente: confirmar com o time se essa conta `b8b993a0-...` é
+mesmo o bot operando via conta própria na Crisp ou se é nome confuso de
+outra coisa — se for o caso, considerar renomear o alias em
+`operator_id_aliases` pra diferenciar visualmente das duas.
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:

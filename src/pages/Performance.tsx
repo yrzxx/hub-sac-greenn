@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Dialog } from "@/components/ui/Dialog";
+import { BarChart } from "@/components/ui/BarChart";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import { useAuth } from "@/contexts/AuthContext";
@@ -87,6 +88,7 @@ export default function Performance() {
   const [direcao, setDirecao] = useState<"asc" | "desc">("desc");
   const [posseDetalhe, setPosseDetalhe] = useState<string | null>(null);
   const [explicacaoVelocidadeAberta, setExplicacaoVelocidadeAberta] = useState(false);
+  const [mostrarTodosMotivos, setMostrarTodosMotivos] = useState(false);
 
   function ordenarPorColuna(campo: OrdenarCampo) {
     if (ordenarPor === campo) {
@@ -255,6 +257,16 @@ export default function Performance() {
             </div>
           )}
 
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-sm font-semibold text-ink">Ranking de atendentes</h2>
+            <button
+              type="button"
+              onClick={() => setExplicacaoVelocidadeAberta(true)}
+              className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs text-ink/50 hover:bg-sand-bg hover:text-ink"
+            >
+              <Info size={13} /> ver mais
+            </button>
+          </div>
           {isLoading ? (
             <p className="text-sm text-ink/50">Carregando...</p>
           ) : !ranking || ranking.length === 0 ? (
@@ -358,6 +370,8 @@ export default function Performance() {
                 </button>
               </div>
               <div className="mt-3 space-y-3 text-sm text-ink/70">
+                <p><span className="font-semibold text-ink">TFR</span> — tempo até a 1ª resposta humana (do início do chamado até um atendente responder; bot não conta).</p>
+                <p><span className="font-semibold text-ink">TTR</span> — tempo até a resolução (do início do chamado até ele ser marcado como resolvido).</p>
                 <p><span className="font-semibold text-ink">Média</span> — soma de todos os tempos dividida pela quantidade de chamados. Pode ser puxada por poucos casos muito lentos (outliers).</p>
                 <p><span className="font-semibold text-ink">P50 (mediana)</span> — metade dos chamados foi respondida/resolvida em até esse tempo. É o "caso típico", menos sensível a outliers que a média.</p>
                 <p><span className="font-semibold text-ink">P90</span> — 90% dos chamados ficaram dentro desse tempo; só os 10% mais lentos passaram disso.</p>
@@ -395,77 +409,82 @@ export default function Performance() {
 
           <div>
             <h2 className="mb-3 font-display text-sm font-semibold text-ink">Relógios do atendimento</h2>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio do cliente</p>
-                <p className="mt-1 text-sm text-ink/60">Abertura até resolução final — é o TTR já mostrado em Velocidade, do ponto de vista de quem esperou.</p>
-              </Card>
-              <Card className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de espera do cliente</p>
-                {loadingEspera ? (
-                  <p className="mt-2 text-sm text-ink/50">Carregando...</p>
-                ) : !esperaCliente || esperaCliente.amostras === 0 ? (
-                  <p className="mt-2 text-sm text-ink/50">Sem amostras (só considera chamados resolvidos).</p>
-                ) : (
-                  <>
-                    <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration((esperaCliente.minutos_espera_medio ?? 0) * 60)}</p>
-                    <p className="mt-1 text-[11px] text-ink/40">
-                      Média por espera · {esperaCliente.amostras} janelas em que o cliente falou e ficou aguardando ação da Greenn
-                    </p>
-                  </>
-                )}
-              </Card>
-              <Card className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de trabalho ativo</p>
-                <p className="mt-1 text-sm text-ink/50">
-                  Sem dado hoje — o Crisp não expõe estado de "ativo/ausente" do operador pela API. Não vou aproximar isso com posse (é outra coisa).
-                </p>
-              </Card>
-            </div>
+            <Card className="p-4">
+              <div className="grid gap-4 border-b border-sand-line pb-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio do cliente</p>
+                  <p className="mt-1 text-sm text-ink/60">É o TTR mostrado em Velocidade, do ponto de vista de quem esperou.</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de espera do cliente</p>
+                  {loadingEspera ? (
+                    <p className="mt-1 text-sm text-ink/50">Carregando...</p>
+                  ) : !esperaCliente || esperaCliente.amostras === 0 ? (
+                    <p className="mt-1 text-sm text-ink/50">Sem amostras.</p>
+                  ) : (
+                    <>
+                      <p className="mt-1 font-display text-kpi-lg font-semibold text-ink">{formatDuration((esperaCliente.minutos_espera_medio ?? 0) * 60)}</p>
+                      <p className="mt-1 text-[11px] text-ink/40">{esperaCliente.amostras} janelas de espera</p>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de trabalho ativo</p>
+                  <p className="mt-1 text-sm text-ink/50">
+                    Sem dado — o Crisp não expõe estado de "ativo/ausente" do operador pela API.
+                  </p>
+                </div>
+              </div>
 
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/40">Relógio de posse — por atendente (chamados resolvidos no período)</p>
+              <p className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-ink/40">Posse por atendente (chamados resolvidos no período)</p>
               {loadingPosse ? (
                 <p className="text-sm text-ink/50">Carregando...</p>
               ) : !posse || posse.length === 0 ? (
-                <Card className="p-4"><p className="text-sm text-ink/50">Sem chamados resolvidos no período pra medir posse.</p></Card>
+                <p className="text-sm text-ink/50">Sem chamados resolvidos no período pra medir posse.</p>
               ) : (
-                <Card className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Atendente</th>
-                        <th className="px-4 py-3 font-medium">Tempo de posse (total)</th>
-                        <th className="px-4 py-3 font-medium">Chamados resolvidos</th>
-                        <th className="px-4 py-3 font-medium">Posse média por chamado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {posse.map((p) => (
-                        <tr
-                          key={p.atendente}
-                          onClick={() => setPosseDetalhe(p.atendente)}
-                          className="cursor-pointer border-t border-sand-line hover:bg-sand-bg"
-                        >
-                          <td className="px-4 py-3 font-medium text-forest-700 underline decoration-forest-300 underline-offset-2">
-                            {p.atendente}
-                            {p.conversas < 5 && <span className="ml-1.5 text-[11px] font-normal text-ink/40">(amostra pequena)</span>}
-                          </td>
-                          <td className="px-4 py-3 text-ink/70">{formatDuration(p.minutos_posse * 60)}</td>
-                          <td className="px-4 py-3 text-ink/70">{p.conversas}</td>
-                          <td className="px-4 py-3 text-ink/70">{formatDuration((p.minutos_posse / p.conversas) * 60)}</td>
+                <>
+                  <BarChart
+                    data={posse.map((p) => ({ label: p.atendente, value: p.minutos_posse / 60, displayValue: `${(p.minutos_posse / 60).toFixed(1)}h` }))}
+                    getColorClass={() => "bg-sky-500"}
+                    height={120}
+                  />
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Atendente</th>
+                          <th className="px-4 py-3 font-medium">Tempo de posse (total)</th>
+                          <th className="px-4 py-3 font-medium">Chamados resolvidos</th>
+                          <th className="px-4 py-3 font-medium">Posse média por chamado</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </Card>
+                      </thead>
+                      <tbody>
+                        {posse.map((p) => (
+                          <tr
+                            key={p.atendente}
+                            onClick={() => setPosseDetalhe(p.atendente)}
+                            className="relative cursor-pointer border-t border-sand-line transition-all hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
+                          >
+                            <td className="px-4 py-3 font-medium text-ink">
+                              {p.atendente}
+                              {p.conversas < 5 && <span className="ml-1.5 text-[11px] font-normal text-ink/40">(amostra pequena)</span>}
+                            </td>
+                            <td className="px-4 py-3 text-ink/70">{formatDuration(p.minutos_posse * 60)}</td>
+                            <td className="px-4 py-3 text-ink/70">{p.conversas}</td>
+                            <td className="px-4 py-3 text-ink/70">{formatDuration((p.minutos_posse / p.conversas) * 60)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
-              <p className="mt-2 text-xs text-ink/40">
+              <p className="mt-3 text-xs text-ink/40">
                 Posse = tempo entre a 1ª mensagem de um atendente num chamado e a entrada do próximo atendente (ou a
                 resolução, se ninguém mais entrar) — cada trecho conta só pra quem estava "com a bola" naquele momento,
                 não o TTR inteiro pra todo mundo que passou pelo chamado. Clique num atendente pra ver os chamados dele.
               </p>
-            </div>
+            </Card>
           </div>
 
           {posseDetalhe && (
@@ -550,28 +569,37 @@ export default function Performance() {
             ) : !motivos || motivos.length === 0 ? (
               <Card className="p-4"><p className="text-sm text-ink/50">Sem tópico classificado no período ainda — a Crisp classifica de forma assíncrona, só depois que um atendente responde.</p></Card>
             ) : (
-              <Card className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Tópico</th>
-                      <th className="px-4 py-3 font-medium">Chamados</th>
-                      <th className="px-4 py-3 font-medium">TFR médio</th>
-                      <th className="px-4 py-3 font-medium">TTR médio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {motivos.map((m) => (
-                      <tr key={m.topico} className="border-t border-sand-line">
-                        <td className="px-4 py-3 font-medium text-ink">{m.topico}</td>
-                        <td className="px-4 py-3 text-ink/70">{m.chamados}</td>
-                        <td className="px-4 py-3 text-ink/70">{formatDuration(m.tfr_media_seg)}</td>
-                        <td className="px-4 py-3 text-ink/70">{formatDuration(m.ttr_media_seg)}</td>
+              <>
+                <Card className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Tópico</th>
+                        <th className="px-4 py-3 font-medium">Chamados</th>
+                        <th className="px-4 py-3 font-medium">TFR médio</th>
+                        <th className="px-4 py-3 font-medium">TTR médio</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
+                    </thead>
+                    <tbody>
+                      {(mostrarTodosMotivos ? motivos : motivos.slice(0, 10)).map((m) => (
+                        <tr key={m.topico} className="border-t border-sand-line">
+                          <td className="px-4 py-3 font-medium text-ink">{m.topico}</td>
+                          <td className="px-4 py-3 text-ink/70">{m.chamados}</td>
+                          <td className="px-4 py-3 text-ink/70">{formatDuration(m.tfr_media_seg)}</td>
+                          <td className="px-4 py-3 text-ink/70">{formatDuration(m.ttr_media_seg)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+                {motivos.length > 10 && (
+                  <div className="mt-2 flex justify-center">
+                    <Button variant="secondary" size="sm" onClick={() => setMostrarTodosMotivos((v) => !v)}>
+                      {mostrarTodosMotivos ? "Ver menos" : `Ver mais (${motivos.length - 10})`}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
             <p className="mt-2 text-xs text-ink/40">
               Tópico é classificado automaticamente pela Crisp por conversa — não é uma categoria fixa reutilizável, então
