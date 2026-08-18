@@ -669,6 +669,21 @@ export async function fetchTempoRespostaBot(inicio: Date, fim: Date, canal?: str
   return (data?.[0] ?? null) as TempoRespostaBot | null;
 }
 
+export interface ContagemPeriodo {
+  total_chamados: number;
+  total_mensagens: number;
+}
+
+export async function fetchContagemPeriodo(inicio: Date, fim: Date, canal?: string): Promise<ContagemPeriodo | null> {
+  const { data, error } = await client().rpc("contagem_periodo", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as ContagemPeriodo | null;
+}
+
 export interface BacklogFaixa {
   faixa: string;
   total: number;

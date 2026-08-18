@@ -26,6 +26,7 @@ import {
   fetchMotivoContatoResumo,
   fetchCsatDistribuicao,
   fetchTempoRespostaBot,
+  fetchContagemPeriodo,
 } from "@/services/api";
 import { resolvePeriodo, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
@@ -76,7 +77,30 @@ function corBacklogBarra(faixa: string) {
   return "bg-rust-600";
 }
 
-const CORES_VIVAS = ["bg-sky-500", "bg-violet-500", "bg-forest-500", "bg-amber-500", "bg-rust-400", "bg-sky-400", "bg-violet-400"];
+// Primeiro nome pra rótulo curto de gráfico — se duas pessoas tiverem o
+// mesmo primeiro nome (ex: duas "Ana"), desambigua com a inicial do
+// sobrenome ("Ana F.", "Ana P.") em vez de mostrar o mesmo rótulo 2x.
+function nomesCurtosDisambiguados(nomesCompletos: string[]): string[] {
+  const partes = nomesCompletos.map((n) => n.trim().split(/\s+/));
+  const contagemPrimeiroNome = new Map<string, number>();
+  partes.forEach((p) => contagemPrimeiroNome.set(p[0], (contagemPrimeiroNome.get(p[0]) ?? 0) + 1));
+  return partes.map((p) => {
+    const repetido = (contagemPrimeiroNome.get(p[0]) ?? 0) > 1;
+    if (repetido && p.length > 1) return `${p[0]} ${p[1][0]}.`;
+    return p[0];
+  });
+}
+
+const CORES_VIVAS = [
+  "bg-sky-500",
+  "bg-rust-500",
+  "bg-forest-500",
+  "bg-violet-600",
+  "bg-amber-600",
+  "bg-sky-700",
+  "bg-rust-700",
+  "bg-forest-700",
+];
 
 type RankingCampo = "total_atendimentos" | "tfr_medio" | "tempo_resolucao_medio" | "csat_medio" | "total_avaliacoes";
 
@@ -144,6 +168,11 @@ export default function Performance() {
   const { data: csatDist } = useQuery({
     queryKey: ["csat-distribuicao", inicio, fim, canal],
     queryFn: () => fetchCsatDistribuicao(inicio, fim, canal || undefined),
+  });
+
+  const { data: contagem } = useQuery({
+    queryKey: ["contagem-periodo", inicio, fim, canal],
+    queryFn: () => fetchContagemPeriodo(inicio, fim, canal || undefined),
   });
 
   const { data: tempoRespostaBot } = useQuery({
@@ -266,6 +295,19 @@ export default function Performance() {
               <option value="unresolved">Pendente</option>
             </select>
           </Card>
+
+          {contagem && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Card className="border-sky-400/30 bg-sky-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Total de chamados</p>
+                <p className="mt-1 font-display text-kpi-lg font-bold text-sky-700">{contagem.total_chamados}</p>
+              </Card>
+              <Card className="border-violet-400/30 bg-violet-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Total de mensagens</p>
+                <p className="mt-1 font-display text-kpi-lg font-bold text-violet-700">{contagem.total_mensagens}</p>
+              </Card>
+            </div>
+          )}
 
           {csatDist && csatDist.total > 0 && (
             <div className="grid gap-4 sm:grid-cols-3">
@@ -402,9 +444,11 @@ export default function Performance() {
             <Card className="p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/40">Volume de atendimentos por pessoa</p>
               <BarChart
-                data={[...rankingHumano]
-                  .sort((a, b) => b.total_atendimentos - a.total_atendimentos)
-                  .map((r) => ({ label: r.operator_nome.split(" ")[0], value: r.total_atendimentos }))}
+                data={(() => {
+                  const ordenado = [...rankingHumano].sort((a, b) => b.total_atendimentos - a.total_atendimentos);
+                  const rotulos = nomesCurtosDisambiguados(ordenado.map((r) => r.operator_nome));
+                  return ordenado.map((r, i) => ({ label: rotulos[i], value: r.total_atendimentos }));
+                })()}
                 getColorClass={(_, i) => CORES_VIVAS[i % CORES_VIVAS.length]}
                 height={110}
               />
