@@ -822,6 +822,46 @@ da tabela de Ranking humano e do gráfico de posse — ficava estranho
 comparar volume/CSAT do bot lado a lado com atendentes reais, e clicar no
 card abre o mesmo popup de chamados usado nas linhas de posse.
 
+**Auditoria em 2026-08-18 — TFR do Meu Painel divergia do Overview:**
+usuário notou que "tempo de primeira resposta" no Meu Painel batia
+diferente do Ranking no Overview. Causa: `minhas_conversas_metricas()`
+(usada só pelo Meu Painel) calculava `tempo_primeira_resposta_seg` a
+partir de `primeira_resposta_humana_at` **sem checar se o usuário logado
+foi de fato quem respondeu primeiro** — só filtrava "conversas onde eu
+sou o operador atual" e pegava o tempo de resposta bruto da conversa,
+igual o bug já corrigido em `atendente_performance()` mais cedo, só que
+essa função irmã nunca recebeu a mesma correção. Confirmado com dado
+real: 2 de 11 chamados do Eduardo tinham resposta de fato da Ana/Vittor,
+inflando a média (9,7min vs 8,4min real). Corrigido: agora só conta
+`tempo_primeira_resposta_seg` quando
+`nome_canonico_por_operator_id(primeiro_atendente_humano_crisp_id,
+primeiro_atendente_humano)` bate com o nome do usuário logado — mesmo
+critério do Overview. Também trocado o filtro de "minhas conversas"
+(que usava `ilike` solto comparando `users.nome` com `operator_nome`
+cru) pelo mesmo `nome_canonico_por_operator_id()` canônico usado em toda
+parte, em vez de substring frágil.
+
+Varredura no banco por padrões parecidos (feita na mesma auditoria):
+- Nenhuma outra função ainda tinha o bug de detecção de bot por
+  substring solto (`ilike '%IA%'`/`'%bot%'`) — as 4 corrigidas mais cedo
+  continuam sendo as únicas com esse padrão, já usando o ancorado.
+- `atendimentos_com_metricas()` já filtra atendente por
+  `nome_canonico_por_operator_id()` (canônico) — sem problema.
+- `horario_por_nome(p_nome)` é **código morto**: usa o mesmo padrão de
+  `ilike` solto pra achar usuário por nome, mas nada mais no banco chama
+  essa função desde o fix arquitetural de 2026-08-16 (documentado acima
+  nesta seção) — inofensiva, mas candidata a limpeza futura.
+- CSAT (`atendente_aliases`, chaveado por e-mail via
+  `normalizar_email_atendente`/`normalizar_nome_atendente`) usa um
+  mecanismo de identidade **intencionalmente separado** de
+  `operator_id_aliases`/`nome_canonico_por_operator_id` (chaveado por
+  `operator_crisp_id`, usado em tudo que vem de `crisp_conversations`) —
+  isso é a decisão arquitetural já documentada (seção 21: CSAT e
+  conversas são fontes de verdade diferentes, ligadas por e-mail, nunca
+  por id). Não é bug, mas vale lembrar que são dois sistemas de
+  reconciliação de nome paralelos — uma mudança de alias num não reflete
+  automaticamente no outro.
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:
