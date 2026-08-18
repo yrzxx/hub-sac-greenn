@@ -614,6 +614,40 @@ export async function fetchRelogioEsperaCliente(inicio: Date, fim: Date, canal?:
   return (data?.[0] ?? null) as RelogioEsperaCliente | null;
 }
 
+export interface MotivoContatoResumo {
+  topico: string;
+  chamados: number;
+  tfr_media_seg: number | null;
+  ttr_media_seg: number | null;
+}
+
+export async function fetchMotivoContatoResumo(inicio: Date, fim: Date, canal?: string): Promise<MotivoContatoResumo[]> {
+  const { data, error } = await client().rpc("motivo_contato_resumo", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as MotivoContatoResumo[];
+}
+
+export interface CsatDistribuicao {
+  boas: number;
+  neutras: number;
+  ruins: number;
+  total: number;
+}
+
+export async function fetchCsatDistribuicao(inicio: Date, fim: Date, canal?: string): Promise<CsatDistribuicao | null> {
+  const { data, error } = await client().rpc("csat_distribuicao_notas", {
+    data_inicio: inicio.toISOString(),
+    data_fim: fim.toISOString(),
+    p_canal: canal ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as CsatDistribuicao | null;
+}
+
 export interface BacklogFaixa {
   faixa: string;
   total: number;

@@ -728,6 +728,36 @@ pode ganhar o mesmo tratamento de fonte por evento (hoje continua só por
 aproximação de mensagem, restrita a resolvidas) — única pendência restante
 deste bloco.
 
+**Reorganização em 2026-08-18 — Performance virou Overview, Analytics
+ficou leve:** por pedido explícito do usuário, Analytics (`/analytics`)
+passou a ser o painel leve pra qualquer colaborador (indicadores básicos,
+evolução, distribuição por canal/status/tópico, ranking de operadores) —
+todo o conteúdo pesado que tinha sido adicionado ali na Fase 1 (Velocidade
+com percentis TFR/TTR, Backlog por idade, Relógios do atendimento, QA)
+foi movido pra `/performance`, renomeada de "Performance" pra **"Overview"**
+(título, sidebar, busca global, `public.modules.nome` — rota e slug
+técnico continuam `/performance`/`performance` por decisão consciente,
+só o nome de exibição mudou). Overview é agora a página principal pro
+admin bater o olho e entender como o time está — a sub-aba "Ranking" virou
+"Dashboard" e concentra tudo isso mais o ranking de atendentes; a aba
+"Atendimentos" ficou só com a lista crua de chamados (filtros + tabela),
+sem os blocos agregados.
+
+Nessa mesma leva: card "Destaque em volume" e lista "Conversas com nota
+baixa" foram removidos do Dashboard, substituídos por 3 cards de
+distribuição de nota (`csat_distribuicao_notas()`, boas 4-5/neutras
+3/ruins 1-2). Nova seção **"Motivo de contato"** (usa `topico`, ver seção
+anterior) ficou como último bloco da aba Dashboard — agrupa por tópico com
+volume + TFR/TTR médio via `motivo_contato_resumo()`; ainda fragmentado
+(tópico é resumo livre por conversa, não categoria fixa), reavaliar
+agrupamento quando tiver mais volume real. Clique num atendente na tabela
+de Relógio de posse abre um popup com os chamados dele no período
+(reaproveita `fetchAtendimentosComMetricas` filtrado por atendente). Os
+cards de Velocidade ganharam um botão "ver mais" com popup explicando
+P50/P90/P95/SLA/média. Cores: CSAT médio, SLA cumprido e faixas de backlog
+seguem verde/amarelo/vermelho em negrito, mesma lógica de faixa usada no
+CSAT (`corPorFaixa`).
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:
@@ -945,7 +975,7 @@ ver seção 6 para a lógica de seções por permissão),
 | Home | `/` | Todo autenticado |
 | Meu Painel | `/meu-painel` | Todo autenticado |
 | Missões | `/missoes` | Todo autenticado (gestão completa é admin-only) |
-| Analytics | `/analytics` | Todo autenticado (ranking/destaque exige permissão `analytics`* ou admin) |
+| Analytics | `/analytics` | Todo autenticado — painel leve (indicadores básicos, evolução, distribuição por canal/status/tópico, ranking exige permissão `analytics`* ou admin) |
 | Reunião de Resultados | `/reuniao-resultados` | Todo autenticado |
 | Cursos | `/cursos` | Todo autenticado |
 | Documentação | `/documentacao` | Todo autenticado |
@@ -957,7 +987,7 @@ ver seção 6 para a lógica de seções por permissão),
 | CSAT | `/csat` | Permissão granular `csat` ou admin |
 | Reclame Aqui | `/reclame-aqui` | Permissão granular `reclame_aqui` ou admin |
 | NPS | `/nps` | Permissão granular `nps` ou admin |
-| Performance | `/performance` | Admin-only estrito (inclui a aba "Atendimentos", que era uma página própria `/atendimentos` até ser incorporada aqui) |
+| Overview (ex-Performance) | `/performance` | Admin-only estrito — página principal pro admin bater o olho no time inteiro; aba "Dashboard" (ex-"Ranking") concentra CSAT boas/neutras/ruins, ranking de atendentes, Velocidade (TFR/TTR com percentis), Backlog, Relógios (posse/espera), QA (placeholder) e Motivo de contato; aba "Atendimentos" é só a lista crua de chamados (era uma página própria `/atendimentos` até ser incorporada aqui) |
 | Em Risco | `/em-risco` | Admin-only estrito — chamados abertos ordenáveis por tempo em aberto/TFR, com filtros de atendente/status/canal e exportação CSV |
 | Administração (Usuários, Perfis, Permissões, Escalas, Aliases de Atendente, Módulos, Cursos, Documentação, Atualizações, Outros Links) | `/admin/*` | Admin-only estrito |
 

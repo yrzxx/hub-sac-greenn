@@ -31,7 +31,7 @@ const ITEMS: Item[] = [
   { label: "CSAT", to: "/csat", icon: Star, perm: "csat" },
   { label: "Reclame Aqui", to: "/reclame-aqui", icon: MessageSquareWarning, perm: "reclame_aqui" },
   { label: "NPS", to: "/nps", icon: Gauge, perm: "nps" },
-  { label: "Performance", to: "/performance", icon: TrendingUp, adminOnly: true },
+  { label: "Overview", to: "/performance", icon: TrendingUp, adminOnly: true },
   { label: "Em Risco", to: "/em-risco", icon: AlertOctagon, adminOnly: true },
   { label: "Administração", to: "/admin", icon: Settings, adminOnly: true },
   { label: "Perfil", to: "/perfil", icon: User },
