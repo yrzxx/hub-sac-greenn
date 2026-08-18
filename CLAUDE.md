@@ -617,6 +617,49 @@ por mim): assinar `session:set_routing` → `insert` em
 `pending`/`unresolved` COM `status` anterior já `resolved`, incrementar
 `reopened_count`.
 
+**Fix aplicado em 2026-08-18 — pipeline de posse ativado via evento real do
+Crisp:** a pendência acima foi resolvida do lado da captura. O evento
+`session:set_routing` só é entregue por **Plugin Hook** (Marketplace), não
+por Website Hook (configurado direto no site) — são dois mecanismos
+diferentes de webhook do Crisp, com suporte a eventos distinto (ver matriz
+completa em `docs.crisp.chat/references/web-hooks/v1/`). O plugin
+"Conversation N8N" já existia no Marketplace mas **nunca tinha sido
+instalado no workspace da Greenn** (só existia em modo dev) — instalado via
+link `app.crisp.chat/initiate/plugin/<id>/`, com scopes de leitura
+`sessions`/`messages`/`states`/`routing`/`operators`, e um Production Web
+Hook criado nele (Settings → Events) apontando pra
+`https://n8n.sac.greenn.com.br/webhook/crisp-conversations`, assinando os 4
+eventos (`message:send`, `message:received`, `session:set_state`,
+`session:set_routing`). O Website Hook antigo (que cobria só
+send/received/set_state) foi **excluído** depois de confirmar que o plugin
+sozinho já entrega tudo (payload real inspecionado tem o header
+`x-crisp-hook-origin: plugin/rtm ... production`, confirmando a origem).
+`operator_routing_history` já recebe linhas reais (`operator_crisp_id`,
+`previous_operator_crisp_id`, `event_at`) a cada troca de atribuição.
+
+Com dado real fluindo, `relogio_posse_periodo()` foi reescrita: agora lê
+**prioritariamente** de `operator_routing_history` — cada evento marca o
+início de uma posse, e o fim é o próximo evento da mesma conversa (ou
+`resolved_at`, ou `now()` se ainda estiver aberta). Deixou de exigir
+conversa resolvida nesse caminho, porque o início da janela já é um evento
+real (não uma aproximação), então não tem mais o risco de posse inflada por
+chamado abandonado que existia na versão por mensagem. A reconstrução por
+`crisp_messages` (como antes) virou só **fallback**, usada apenas pra
+conversas que ainda não têm nenhum evento de roteamento capturado (dado
+anterior à instalação do plugin) — e continua restrita a resolvidas, porque
+nesse caminho não existe um fim de posse confiável para conversa aberta. As
+duas fontes nunca se misturam para a mesma conversa. Validado com dado real:
+duas conversas abertas (`pending`) do dia 2026-08-18 já aparecem com posse
+calculada corretamente até `now()`.
+
+Ainda pendente: confirmar em produção que a lógica de reabertura
+(`reopened_count`/`first_resolved_at` via `session:set_state`, código já
+preparado nos nós `Code in JavaScript`/`HTTP Request3` do n8n) está
+realmente incrementando — não testado ainda com uma reabertura real. E,
+com mais alguns dias de dado real acumulado em `operator_routing_history`,
+`relogio_espera_cliente()` pode ganhar o mesmo tratamento (hoje continua só
+por aproximação de mensagem, restrita a resolvidas).
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:
