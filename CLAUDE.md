@@ -862,6 +862,82 @@ Varredura no banco por padrões parecidos (feita na mesma auditoria):
   reconciliação de nome paralelos — uma mudança de alias num não reflete
   automaticamente no outro.
 
+**Feature nova em 2026-08-18 — pop-up de detalhe em dado truncado (CSAT):**
+por pedido do usuário ("onde os dados não ficam completos como o
+comentário nessa aba"), criado `src/components/CsatDetalheDialog.tsx`
+(compartilhado): mostra todos os campos de uma avaliação de CSAT sem
+cortar (cliente, telefone, e-mail, tags, comentário inteiro, link do
+chamado), acionado clicando na linha da tabela — aplicado em CSAT →
+Planilha e em Meu Painel (histórico pessoal de avaliações), único lugar
+onde o padrão fazia sentido depois de varrer a plataforma por
+`truncate`/`title=` cortado. Nesse mesmo lote, o gráfico "CSAT por
+colaborador" (Csat.tsx) ganhou quantidade de avaliações e média por
+atendente, e o helper `nomesCurtosDisambiguados()` (desambigua nomes
+duplicados tipo as duas "Ana" com inicial do sobrenome) saiu de dentro de
+`Performance.tsx` pra `src/lib/utils.ts`, compartilhado entre Overview e
+CSAT.
+
+**Fix aplicado em 2026-08-18 (mais tarde) — campos vazios do CSAT
+apareciam em branco em vez de "—":** usuário notou "E-mail do cliente" e
+"Telefone" sem o placeholder padrão no popup novo. Causa: o n8n grava
+string vazia (`''`) em campos sem dado, não `null` — e o componente usava
+`?? "—"` (só cobre `null`/`undefined`, não string vazia). Confirmado no
+banco: 2 registros com `email = ''`, 13 com `telefone = ''`, 15 com
+`numero_whatsapp = ''`, de 20 totais — não é exclusivo de um registro.
+Corrigido trocando `??` por `||` nesses dois campos em
+`CsatDetalheDialog.tsx`. Os campos "Tempo até 1ª resposta"/"Tempo até
+encerramento" continuam mostrando "—" corretamente — isso não é bug (ver
+seção 7/8: `tempo_primeira_resposta_seg`/`tempo_encerramento_seg` nunca
+são preenchidos pelo n8n pro CSAT, e `crisp_id`/`conversation_id` — o
+vínculo que permitiria buscar o tempo em `crisp_conversations` — está
+100% nulo). Investigado se dava pra recuperar por aproximação (atendente +
+horário próximo): não há nenhuma `crisp_conversations` correspondente
+nem no dia inteiro pro caso investigado, e mesmo quando houvesse seria
+arriscado — `csat_results.data_hora` é o momento em que o **cliente
+respondeu a pesquisa**, não o do atendimento, podem ser horas de
+diferença.
+
+**Achado na mesma auditoria — `crisp_conversations.operator_email` está
+sempre `NULL` no dado atual (268/268 linhas), apesar de seções deste
+documento (7, 8, 10) descreverem esse campo como "vínculo confiável" —
+essa descrição ficou desatualizada** desde que a reconciliação migrou pra
+`operator_crisp_id`/`operator_id_aliases` (fix de 2026-08-17, ver acima
+nesta seção). Nenhuma função SQL em uso depende de `operator_email` hoje
+(`atendente_performance`/`minhas_conversas_metricas` já usam
+`nome_canonico_por_operator_id()`); o único lugar do frontend que ainda
+filtra por ele é `fetchConversasFiltered()`
+(`src/services/api.ts:1087`, `query.eq("operator_email", atendenteEmail)`)
+— mas essa função **não é chamada por nenhuma página** (código morto,
+mesma categoria de `horario_por_nome`), então o filtro quebrado nunca
+chegou a afetar usuário real. Continua valendo por e-mail apenas pro CSAT
+(`csat_results.email_atendente`, mecanismo separado, confirmado populado).
+Não corrigido agora por não ter impacto ativo; candidato à mesma limpeza
+futura de `horario_por_nome`.
+
+**Fix aplicado em 2026-08-18 (mais tarde) — TFR do Meu Painel unificado
+com o de Overview:** usuário questionou por que "tempo de primeira
+resposta" deveria variar por tela ("o tempo de primeira resposta sempre
+vai ser padrão") depois da auditoria acima — no dado real do período
+01/08–18/08, Overview mostrava 16,7min pro Eduardo (base: 15 conversas
+onde ele foi quem respondeu primeiro, não importa quem ficou com a
+conversa depois) enquanto Meu Painel mostrava 20,9min (base: 11
+conversas, a interseção entre "está comigo agora" e "fui eu quem
+respondeu"). As duas contas estavam corretas pro que cada uma calculava,
+mas representavam populações diferentes sob o mesmo nome de métrica.
+Decisão: TFR passa a ser sempre o critério de Overview (quem de fato deu
+a 1ª resposta, independente de posse atual) em toda a plataforma;
+"Total de chamados"/"Tempo de resolução" continuam baseados na carteira
+atual (mesmo critério das colunas irmãs em `atendente_performance`).
+`minhas_conversas_metricas()` foi reescrita: em vez de filtrar a base só
+por "conversa está comigo agora", passou a incluir também conversas onde
+fui eu quem respondeu primeiro mas que já foram repassadas — cada linha
+ganhou uma flag `minha_carteira` (true = posse atual) pro frontend separar
+o que conta pra "Total de chamados"/"Tempo de resolução" (`filter(c =>
+c.minha_carteira)`) do que conta pra "Tempo de primeira resposta" (lista
+inteira, sem esse filtro). Validado: Meu Painel do Eduardo passou a
+mostrar 16min 43s (bate com Overview) mantendo "Total de chamados: 13"
+intocado.
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:

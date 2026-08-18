@@ -31,7 +31,7 @@ import {
 import { resolvePeriodo, type PeriodoPreset } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
 import { formatDurationFromMinutes as formatMin } from "@/lib/formatDuration";
-import { cn } from "@/lib/utils";
+import { cn, nomesCurtosDisambiguados } from "@/lib/utils";
 import { DateRangePopover } from "@/components/ui/DateRangePopover";
 
 const statusTone: Record<string, "success" | "warning" | "neutral"> = {
@@ -75,20 +75,6 @@ function corBacklogBarra(faixa: string) {
   if (faixa === "2-3 dias") return "bg-amber-500";
   if (faixa === "4-7 dias") return "bg-rust-400";
   return "bg-rust-600";
-}
-
-// Primeiro nome pra rótulo curto de gráfico — se duas pessoas tiverem o
-// mesmo primeiro nome (ex: duas "Ana"), desambigua com a inicial do
-// sobrenome ("Ana F.", "Ana P.") em vez de mostrar o mesmo rótulo 2x.
-function nomesCurtosDisambiguados(nomesCompletos: string[]): string[] {
-  const partes = nomesCompletos.map((n) => n.trim().split(/\s+/));
-  const contagemPrimeiroNome = new Map<string, number>();
-  partes.forEach((p) => contagemPrimeiroNome.set(p[0], (contagemPrimeiroNome.get(p[0]) ?? 0) + 1));
-  return partes.map((p) => {
-    const repetido = (contagemPrimeiroNome.get(p[0]) ?? 0) > 1;
-    if (repetido && p.length > 1) return `${p[0]} ${p[1][0]}.`;
-    return p[0];
-  });
 }
 
 const CORES_VIVAS = [

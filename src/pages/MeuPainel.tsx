@@ -30,6 +30,7 @@ import {
 } from "@/lib/dateRanges";
 import { formatDuration } from "@/lib/formatDuration";
 import type { DbCsatResult } from "@/types/database";
+import { CsatDetalheDialog } from "@/components/CsatDetalheDialog";
 
 function media(vals: (number | null)[]) {
   const validos = vals.filter((v): v is number => v !== null);
@@ -51,6 +52,7 @@ export default function MeuPainel() {
   const [personalizado, setPersonalizado] = useState({ inicio: "", fim: "" });
   const [sortField, setSortField] = useState<SortField>("data_hora");
   const [sortAsc, setSortAsc] = useState(false);
+  const [detalhe, setDetalhe] = useState<DbCsatResult | null>(null);
 
   const { inicio, fim } = useMemo(
     () => resolvePeriodo(preset, personalizado),
@@ -112,10 +114,16 @@ export default function MeuPainel() {
 
   const conversasPeriodo = conversas ?? [];
   const conversasAnteriorLista = conversasAnterior ?? [];
+  // "Total de chamados"/"Tempo de resolução" refletem a carteira atual (conversas
+  // que estão comigo agora); "Tempo de primeira resposta" usa a lista inteira,
+  // porque conta sempre que fui eu quem respondeu primeiro, mesmo se a conversa
+  // foi repassada depois — mesmo critério usado no ranking de Overview.
+  const conversasPeriodoCarteira = conversasPeriodo.filter((c) => c.minha_carteira);
+  const conversasAnteriorCarteira = conversasAnteriorLista.filter((c) => c.minha_carteira);
   const tempoPrimeiraResposta = media(conversasPeriodo.map((c) => c.tempo_primeira_resposta_seg));
   const tempoPrimeiraRespostaAnterior = media(conversasAnteriorLista.map((c) => c.tempo_primeira_resposta_seg));
-  const tempoResolucao = media(conversasPeriodo.map((c) => c.tempo_resolucao_seg));
-  const tempoResolucaoAnterior = media(conversasAnteriorLista.map((c) => c.tempo_resolucao_seg));
+  const tempoResolucao = media(conversasPeriodoCarteira.map((c) => c.tempo_resolucao_seg));
+  const tempoResolucaoAnterior = media(conversasAnteriorCarteira.map((c) => c.tempo_resolucao_seg));
 
   const missoesConcluidas = (missions ?? []).filter(
     (m) => m.atual >= (m.missions?.meta ?? Infinity)
@@ -210,8 +218,8 @@ export default function MeuPainel() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <Kpi
             label="Total de chamados"
-            value={loadingConversas ? "..." : String(conversasPeriodo.length)}
-            delta={variacao(conversasPeriodo.length, conversasAnteriorLista.length || null)}
+            value={loadingConversas ? "..." : String(conversasPeriodoCarteira.length)}
+            delta={variacao(conversasPeriodoCarteira.length, conversasAnteriorCarteira.length || null)}
             icon={PhoneCall}
           />
           <Kpi
@@ -346,7 +354,11 @@ export default function MeuPainel() {
               </thead>
               <tbody>
                 {linhasOrdenadas.slice(0, 8).map((c) => (
-                  <tr key={c.id} className="border-t border-sand-line/70 hover:bg-sand-bg/60">
+                  <tr
+                    key={c.id}
+                    onClick={() => setDetalhe(c)}
+                    className="cursor-pointer border-t border-sand-line/70 transition-all hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
+                  >
                     <td className="px-5 py-3 text-ink/60">
                       {new Date(c.data_hora).toLocaleString("pt-BR")}
                     </td>
@@ -372,6 +384,8 @@ export default function MeuPainel() {
           )}
         </CardContent>
       </Card>
+
+      {detalhe && <CsatDetalheDialog registro={detalhe} onClose={() => setDetalhe(null)} />}
     </div>
   );
 }

@@ -1570,6 +1570,11 @@ export interface MinhaConversaMetrica {
   tempo_primeira_resposta_seg: number | null;
   tempo_resolucao_seg: number | null;
   status: string | null;
+  // true quando a conversa está atualmente com o usuário (usar pra "Total de
+  // chamados"/"Tempo de resolução"); tempo_primeira_resposta_seg é preenchido
+  // sempre que o usuário respondeu primeiro, mesmo em linhas com minha_carteira
+  // false (conversa repassada depois) — mesmo critério do ranking em Overview.
+  minha_carteira: boolean;
 }
 
 export async function fetchMinhasConversasMetricas(inicio: Date, fim: Date): Promise<MinhaConversaMetrica[]> {
