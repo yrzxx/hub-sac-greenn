@@ -278,7 +278,10 @@ export default function Performance() {
           {iaEntry && (
             <div>
               <h2 className="mb-3 font-display text-sm font-semibold text-ink">Bot (IA Greenn)</h2>
-              <Card className="flex flex-wrap items-center gap-6 border-sky-400/30 bg-sky-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+              <Card
+                onClick={() => setPosseDetalhe("IA Greenn")}
+                className="flex cursor-pointer flex-wrap items-center gap-6 border-sky-400/30 bg-sky-500/5 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+              >
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Atendimentos</p>
                   <p className="mt-1 font-display text-kpi-lg font-bold text-ink">{iaEntry.total_atendimentos}</p>

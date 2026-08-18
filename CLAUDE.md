@@ -776,6 +776,46 @@ exibição. **Confirmado pelo usuário em 2026-08-18**: `b8b993a0-...`
 (`allan@gdigital.com.br`) é mesmo a conta usada pra criação/configuração
 do bot — é o bot legítimo, não confusão de nome. Alias mantido como está.
 
+**Bug crítico corrigido em 2026-08-18 — detecção de bot por
+`operator_nome ilike '%IA%'` excluía/incluía gente errada:** ao investigar
+por que "Nathalia Cavalcanti" e "Ana Paula Maximiano de Souza" apareciam
+com TFR "—" (nenhuma amostra) mesmo tendo respondido chamados de verdade,
+achei que o padrão usado em **4 funções** pra identificar bot por nome —
+`operator_nome ilike '%IA%'` — também casa com qualquer nome que contenha
+"ia" como substring em qualquer posição: "Nathal**ia**", "Max**ia**no"
+(dentro de "Maximiano"). Resultado: 32 mensagens reais dessas duas
+pessoas eram tratadas como se fossem do bot e excluídas de
+`_primeiras_respostas_humanas()` — o que também explicava a inflação de
+`tempo_resposta_bot()` (mensagens humanas rápidas sendo contadas como se
+fossem do bot) e outros números estranhos: `relogio_espera_cliente()` e
+o Tier C de `relogio_posse_periodo()` tinham o mesmo problema.
+
+Verificação com dado real: toda mensagem genuína do bot tem
+`operator_nome` exatamente `"Atendente IA Greenn"` (nunca variação) e
+`origin` em `urn:crisp.im:bot:0` ou `urn:allan.godoy:greenn:0` (integração
+própria do bot, mensagens que não passam pelo canal `crisp.im:bot`
+padrão). As 32 mensagens humanas mal-classificadas tinham `origin = "chat"`
+e nome exatamente "Nathalia"/"Nathalia Cavalcanti"/"Ana Paula Maximiano de
+Souza" — nunca `origin` de bot.
+
+Corrigido nas 4 funções (`_primeiras_respostas_humanas`,
+`relogio_espera_cliente`, `relogio_posse_periodo`, `tempo_resposta_bot`)
+trocando o padrão solto por um ancorado: `operator_nome ilike 'Atendente
+IA%'` (prefixo, não substring solta) **or** `origin ilike '%crisp.im:bot%'`
+**or** `origin ilike '%allan.godoy%'`. Como `atendente_performance`,
+`tfr_ttr_percentis`, `atendimentos_com_metricas` e `motivo_contato_resumo`
+só consomem `_primeiras_respostas_humanas()` (não reimplementam a
+detecção), corrigir na fonte já resolveu pra todas — nenhuma delas
+precisou de alteração própria. Validado: `tempo_resposta_bot()` caiu de
+195,7s de média (com outlier de 4h de uma mensagem tardia da Nathalia) pra
+14,7s (mediana real do bot); Nathalia passou a mostrar TFR real (2h14min,
+não mais "—").
+
+Nesse mesmo lote: card dedicado "Bot (IA Greenn)" no Overview, separado
+da tabela de Ranking humano e do gráfico de posse — ficava estranho
+comparar volume/CSAT do bot lado a lado com atendentes reais, e clicar no
+card abre o mesmo popup de chamados usado nas linhas de posse.
+
 ## 11. Principais componentes reutilizáveis
 
 Todos em `src/components/ui/`:
