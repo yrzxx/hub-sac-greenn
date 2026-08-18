@@ -1480,6 +1480,7 @@ export interface AtendimentoComMetricas {
   resolved_at: string | null;
   tempo_primeira_resposta_seg: number | null;
   tempo_resolucao_seg: number | null;
+  tempo_primeira_resposta_geral_seg: number | null;
   invalido_resposta_antes_inicio: boolean;
   invalido_sem_resposta_humana: boolean;
   invalido_tempo_negativo: boolean;

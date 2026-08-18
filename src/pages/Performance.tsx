@@ -170,6 +170,12 @@ export default function Performance() {
     return copia;
   }, [ranking, rankingOrdenarPor, rankingDirecao]);
 
+  const posseMap = useMemo(() => {
+    const mapa = new Map<string, { minutos_posse: number; conversas: number }>();
+    (posse ?? []).forEach((p) => mapa.set(p.atendente, p));
+    return mapa;
+  }, [posse]);
+
   const filtrosAtendimentos = useMemo(
     () => ({
       inicio, fim,
@@ -282,23 +288,45 @@ export default function Performance() {
                     <SortableHeader field="tempo_resolucao_medio" label="Tempo médio de resolução" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="csat_medio" label="CSAT médio" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
                     <SortableHeader field="total_avaliacoes" label="Avaliações" ordenarPor={rankingOrdenarPor} direcao={rankingDirecao} onSort={ordenarRankingPorColuna} />
+                    <th className="px-4 py-3 font-medium">Tempo de posse</th>
+                    <th className="px-4 py-3 font-medium">Chamados c/ posse</th>
+                    <th className="px-4 py-3 font-medium">Posse média</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(rankingOrdenado ?? []).map((r) => (
-                    <tr key={r.operator_email ?? r.operator_nome} className="border-t border-sand-line">
-                      <td className="px-4 py-3 font-medium text-ink">{r.operator_nome}</td>
-                      <td className="px-4 py-3 text-ink/70">{r.total_atendimentos}</td>
-                      <td className="px-4 py-3 text-ink/70">{formatMin(r.tfr_medio)}</td>
-                      <td className="px-4 py-3 text-ink/70">{formatMin(r.tempo_resolucao_medio)}</td>
-                      <td className={cn("px-4 py-3 font-semibold", corTextoCsat(r.csat_medio))}>{r.csat_medio?.toFixed(1) ?? "—"}</td>
-                      <td className="px-4 py-3 text-ink/70">{r.total_avaliacoes}</td>
-                    </tr>
-                  ))}
+                  {(rankingOrdenado ?? []).map((r) => {
+                    const p = posseMap.get(r.operator_nome);
+                    return (
+                      <tr
+                        key={r.operator_email ?? r.operator_nome}
+                        onClick={p ? () => setPosseDetalhe(r.operator_nome) : undefined}
+                        className={cn(
+                          "border-t border-sand-line transition-all",
+                          p && "relative cursor-pointer hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
+                        )}
+                      >
+                        <td className="px-4 py-3 font-medium text-ink">{r.operator_nome}</td>
+                        <td className="px-4 py-3 text-ink/70">{r.total_atendimentos}</td>
+                        <td className="px-4 py-3 text-ink/70">{formatMin(r.tfr_medio)}</td>
+                        <td className="px-4 py-3 text-ink/70">{formatMin(r.tempo_resolucao_medio)}</td>
+                        <td className={cn("px-4 py-3 font-semibold", corTextoCsat(r.csat_medio))}>{r.csat_medio?.toFixed(1) ?? "—"}</td>
+                        <td className="px-4 py-3 text-ink/70">{r.total_avaliacoes}</td>
+                        <td className="px-4 py-3 text-ink/70">{p ? formatDuration(p.minutos_posse * 60) : "—"}</td>
+                        <td className="px-4 py-3 text-ink/70">{p ? p.conversas : "—"}</td>
+                        <td className="px-4 py-3 text-ink/70">{p ? formatDuration((p.minutos_posse / p.conversas) * 60) : "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </Card>
           )}
+          <p className="text-xs text-ink/40">
+            "Total de atendimentos" conta chamados onde a pessoa é a atendente registrada agora. "Chamados c/ posse"
+            conta de forma diferente — inclui trechos em que a pessoa segurou o chamado mesmo que outra tenha assumido
+            depois (handoff), por isso os dois números não precisam bater. Clique numa linha com posse pra ver os
+            chamados específicos.
+          </p>
 
           <div>
             <div className="mb-3 flex items-center gap-2">
@@ -442,47 +470,17 @@ export default function Performance() {
               ) : !posse || posse.length === 0 ? (
                 <p className="text-sm text-ink/50">Sem chamados resolvidos no período pra medir posse.</p>
               ) : (
-                <>
-                  <BarChart
-                    data={posse.map((p) => ({ label: p.atendente, value: p.minutos_posse / 60, displayValue: `${(p.minutos_posse / 60).toFixed(1)}h` }))}
-                    getColorClass={() => "bg-sky-500"}
-                    height={120}
-                  />
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-sand-bg text-left text-xs uppercase tracking-wide text-ink/50">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">Atendente</th>
-                          <th className="px-4 py-3 font-medium">Tempo de posse (total)</th>
-                          <th className="px-4 py-3 font-medium">Chamados resolvidos</th>
-                          <th className="px-4 py-3 font-medium">Posse média por chamado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {posse.map((p) => (
-                          <tr
-                            key={p.atendente}
-                            onClick={() => setPosseDetalhe(p.atendente)}
-                            className="relative cursor-pointer border-t border-sand-line transition-all hover:relative hover:z-10 hover:scale-[1.01] hover:bg-white hover:shadow-card-hover"
-                          >
-                            <td className="px-4 py-3 font-medium text-ink">
-                              {p.atendente}
-                              {p.conversas < 5 && <span className="ml-1.5 text-[11px] font-normal text-ink/40">(amostra pequena)</span>}
-                            </td>
-                            <td className="px-4 py-3 text-ink/70">{formatDuration(p.minutos_posse * 60)}</td>
-                            <td className="px-4 py-3 text-ink/70">{p.conversas}</td>
-                            <td className="px-4 py-3 text-ink/70">{formatDuration((p.minutos_posse / p.conversas) * 60)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                <BarChart
+                  data={posse.map((p) => ({ label: p.atendente, value: p.minutos_posse / 60, displayValue: `${(p.minutos_posse / 60).toFixed(1)}h` }))}
+                  getColorClass={() => "bg-sky-500"}
+                  height={120}
+                />
               )}
               <p className="mt-3 text-xs text-ink/40">
                 Posse = tempo entre a 1ª mensagem de um atendente num chamado e a entrada do próximo atendente (ou a
                 resolução, se ninguém mais entrar) — cada trecho conta só pra quem estava "com a bola" naquele momento,
-                não o TTR inteiro pra todo mundo que passou pelo chamado. Clique num atendente pra ver os chamados dele.
+                não o TTR inteiro pra todo mundo que passou pelo chamado. Detalhamento por atendente está na tabela de
+                Ranking, no topo da página.
               </p>
             </Card>
           </div>
@@ -521,7 +519,17 @@ export default function Performance() {
                               <p className="text-xs text-ink/50">{c.cliente_email}</p>
                             </td>
                             <td className="px-3 py-2 text-xs text-ink/60">{new Date(c.current_started_at).toLocaleString("pt-BR")}</td>
-                            <td className="px-3 py-2 text-ink/70">{formatDuration(c.tempo_primeira_resposta_seg)}</td>
+                            <td className="px-3 py-2 text-ink/70">
+                              {c.tempo_primeira_resposta_seg !== null ? (
+                                formatDuration(c.tempo_primeira_resposta_seg)
+                              ) : c.tempo_primeira_resposta_geral_seg !== null ? (
+                                <span title="Só o bot respondeu até agora, nenhum humano ainda">
+                                  {formatDuration(c.tempo_primeira_resposta_geral_seg)} <span className="text-[11px] text-ink/40">(bot)</span>
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
                             <td className="px-3 py-2 text-ink/70">{formatDuration(c.tempo_resolucao_seg)}</td>
                             <td className="px-3 py-2">
                               <Badge tone={c.status ? statusTone[c.status] ?? "neutral" : "neutral"}>
