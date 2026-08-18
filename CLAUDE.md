@@ -694,11 +694,39 @@ acumulado antes do pipeline de eventos reais estar completo com dado novo
 e confiável daqui pra frente. `operator_id_aliases` foi mantida (não é
 dado do pipeline, é configuração).
 
-Ainda pendente: implementar o corte de posse na resolução/reabertura
-(gap acima). Com mais alguns dias de dado real acumulado em
-`operator_routing_history`, `relogio_espera_cliente()` pode ganhar o
-mesmo tratamento de fonte por evento (hoje continua só por aproximação de
-mensagem, restrita a resolvidas).
+**Fix aplicado em 2026-08-18 (mesmo dia) — corte de posse na resolução
+implementado:** criada `crisp_conversation_state_history` (`session_id`,
+`state`, `event_at`), populada pelo n8n a cada `session:set_state` (branch
+Set_state ganhou um `HTTP Request14` em paralelo ao `HTTP Request4`
+existente, gravando o evento cru — mesmo padrão do `HTTP Request13` que já
+gravava roteamento). `relogio_posse_periodo()` foi reescrita de novo,
+agora em 3 níveis:
+- **Tier A** (melhor, quando a sessão tem roteamento E histórico de estado
+  reais): cruza as duas linhas do tempo — em cada intervalo entre
+  eventos, sabe quem tava atribuído e se a conversa tava resolvida nesse
+  instante, via subquery correlacionada buscando o último valor de cada
+  tipo até aquele ponto (Postgres não suporta `IGNORE NULLS` em funções de
+  janela, por isso não deu pra usar `last_value` direto). Só soma posse
+  nos trechos em que o estado vigente **não** é `resolved` (nulo antes do
+  1º evento de estado é tratado como "não resolvido", já que toda conversa
+  nasce pending/aberta).
+- **Tier B**: sessão tem roteamento mas ainda não tem nenhum evento de
+  estado capturado (dado anterior a essa mudança) — mantém o
+  comportamento anterior (sem cortar por resolução).
+- **Tier C**: sessão sem nenhum evento de roteamento — aproximação por
+  mensagem de sempre, restrita a resolvidas.
+
+Validado com o mesmo chamado de teste: dois trechos marcados como
+`resolved` (14 e ~100+ segundos, um deles ainda crescendo por estar
+resolvido no momento do teste) ficaram corretamente de fora da posse do
+Eduardo, enquanto um trecho de ~86min genuinamente `pending` (aberto, sem
+retomada) continuou contando normalmente — confirma que o corte é por
+estado real, não por tempo parado em geral.
+
+Com mais alguns dias de dado real acumulado, `relogio_espera_cliente()`
+pode ganhar o mesmo tratamento de fonte por evento (hoje continua só por
+aproximação de mensagem, restrita a resolvidas) — única pendência restante
+deste bloco.
 
 ## 11. Principais componentes reutilizáveis
 
